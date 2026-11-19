@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contact Manager</title>
+  <style>
+    :root { --bg:#f4f6fb; --card:#fff; --text:#1f2937; --muted:#6b7280; --primary:#4f46e5; --danger:#dc2626; --border:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); }
+    header { background:var(--primary); color:#fff; padding:16px 24px; }
+    header a { color:#fff; text-decoration:none; font-size:20px; font-weight:600; }
+    main { max-width:900px; margin:24px auto; padding:0 16px; }
+    .card { background:var(--card); border-radius:10px; padding:20px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .btn { display:inline-block; padding:8px 14px; border-radius:6px; border:none; cursor:pointer; font-size:14px; text-decoration:none; color:#fff; background:var(--primary); }
+    .btn.secondary { background:#6b7280; }
+    .btn.danger { background:var(--danger); }
+    .btn.sm { padding:5px 10px; font-size:13px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--border); }
+    th { color:var(--muted); font-size:13px; text-transform:uppercase; }
+    .toolbar { display:flex; gap:10px; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; }
+    input[type=text], input[type=email] { padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:14px; width:100%; }
+    .search { display:flex; gap:8px; flex:1; max-width:400px; }
+    label { display:block; margin:12px 0 4px; font-weight:500; }
+    .flash { padding:10px 14px; border-radius:6px; margin-bottom:12px; }
+    .flash.success { background:#dcfce7; color:#166534; }
+    .flash.error { background:#fee2e2; color:#991b1b; }
+    .empty { text-align:center; color:var(--muted); padding:30px; }
+    .actions { display:flex; gap:6px; }
+    form.inline { display:inline; }
+  </style>
+</head>
+<body>
+  <header><a href="{{ url_for('index') }}">📇 Contact Manager</a></header>
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

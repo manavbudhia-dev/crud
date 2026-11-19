@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:500px;margin:auto;">
+  <h2 style="margin-top:0">{{ action }} Contact</h2>
+  <form method="post">
+    <label for="name">Name *</label>
+    <input type="text" id="name" name="name" value="{{ item['name'] or '' }}" required>
+    <label for="email">Email *</label>
+    <input type="email" id="email" name="email" value="{{ item['email'] or '' }}" required>
+    <label for="phone">Phone</label>
+    <input type="text" id="phone" name="phone" value="{{ item['phone'] or '' }}">
+    <div style="margin-top:18px;display:flex;gap:8px;">
+      <button class="btn" type="submit">{{ action }}</button>
+      <a class="btn secondary" href="{{ url_for('index') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
