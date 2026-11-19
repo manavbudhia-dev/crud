@@ -1,18 +1,65 @@
 import os
 import sqlite3
+import time
+from urllib.parse import quote_plus
+
 from flask import Flask, render_template, request, redirect, url_for, flash, g
 
 DB_PATH = os.environ.get("DB_PATH", "/data/app.db")
+
+
+def _database_url():
+    """Postgres URL from DATABASE_URL, or built from DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME."""
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if url:
+        return url
+    host = os.environ.get("DB_HOST", "").strip()
+    if not host:
+        return None
+    user = quote_plus(os.environ.get("DB_USER", "postgres"))
+    password = quote_plus(os.environ.get("DB_PASSWORD", ""))
+    port = os.environ.get("DB_PORT", "5432")
+    name = os.environ.get("DB_NAME", "postgres")
+    auth = f"{user}:{password}" if password else user
+    return f"postgresql://{auth}@{host}:{port}/{name}"
+
+
+DATABASE_URL = _database_url()
+USE_POSTGRES = DATABASE_URL is not None
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 
 
+class DB:
+    """Tiny wrapper so the same SQL (with ? placeholders) works on SQLite and Postgres."""
+
+    def __init__(self):
+        if USE_POSTGRES:
+            import psycopg
+            from psycopg.rows import dict_row
+
+            self.conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=10)
+        else:
+            os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+            self.conn = sqlite3.connect(DB_PATH)
+            self.conn.row_factory = sqlite3.Row
+
+    def execute(self, sql, params=()):
+        if USE_POSTGRES:
+            sql = sql.replace("?", "%s")
+        return self.conn.execute(sql, params)
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.conn.close()
+
+
 def get_db():
     if "db" not in g:
-        os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = DB()
     return g.db
 
 
@@ -23,18 +70,29 @@ def close_db(_exc):
         db.close()
 
 
-def init_db():
-    with app.app_context():
-        get_db().execute(
-            """CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL,
-                phone TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )"""
-        )
-        get_db().commit()
+def init_db(retries=10, delay=3):
+    id_col = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    for attempt in range(1, retries + 1):
+        try:
+            db = DB()
+            db.execute(
+                f"""CREATE TABLE IF NOT EXISTS items (
+                    id {id_col},
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    phone TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )"""
+            )
+            db.commit()
+            db.close()
+            print(f"Database ready ({'postgres' if USE_POSTGRES else 'sqlite'})", flush=True)
+            return
+        except Exception as exc:  # DB may not be up yet
+            print(f"DB init attempt {attempt}/{retries} failed: {exc}", flush=True)
+            if attempt == retries:
+                raise
+            time.sleep(delay)
 
 
 @app.route("/")
@@ -107,7 +165,11 @@ def delete(item_id):
 
 @app.route("/health")
 def health():
-    return {"status": "ok"}
+    try:
+        get_db().execute("SELECT 1")
+        return {"status": "ok", "db": "postgres" if USE_POSTGRES else "sqlite"}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}, 503
 
 
 init_db()
