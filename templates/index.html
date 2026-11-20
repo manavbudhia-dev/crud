@@ -21,6 +21,7 @@
         <td class="actions">
           <a class="btn sm secondary" href="{{ url_for('edit', item_id=it.id) }}">Edit</a>
           <form class="inline" method="post" action="{{ url_for('delete', item_id=it.id) }}" data-name="{{ it.name }}" onsubmit="return confirm('Delete ' + this.dataset.name + '?');">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
             <button class="btn sm danger" type="submit">Delete</button>
           </form>
         </td>
