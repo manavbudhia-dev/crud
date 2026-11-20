@@ -73,6 +73,7 @@ def close_db(_exc):
 def init_db(retries=10, delay=3):
     id_col = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
     for attempt in range(1, retries + 1):
+        db = None
         try:
             db = DB()
             db.execute(
@@ -85,7 +86,6 @@ def init_db(retries=10, delay=3):
                 )"""
             )
             db.commit()
-            db.close()
             print(f"Database ready ({'postgres' if USE_POSTGRES else 'sqlite'})", flush=True)
             return
         except Exception as exc:  # DB may not be up yet
@@ -93,6 +93,9 @@ def init_db(retries=10, delay=3):
             if attempt == retries:
                 raise
             time.sleep(delay)
+        finally:
+            if db is not None:
+                db.close()
 
 
 @app.route("/")
