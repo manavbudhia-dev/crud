@@ -3,6 +3,7 @@ package com.papervault.scanner.ui.detail
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.EditNote
@@ -127,6 +128,7 @@ fun DocumentDetailScreen(
                             }
                     }
                 }
+                DetailAction(Icons.Default.SwapHoriz, "Convert", Modifier.weight(1f)) { onNavigate(Routes.convert(d.id)) }
                 DetailAction(Icons.Default.Share, "Share", Modifier.weight(1f)) { ShareUtils.shareDocument(context, d) }
             }
         },

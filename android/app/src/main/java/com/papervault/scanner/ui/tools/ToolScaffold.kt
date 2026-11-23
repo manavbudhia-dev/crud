@@ -116,6 +116,17 @@ private fun DoneCard(s: ToolStatus.Done, onOpenDocument: (Long) -> Unit, onReset
                 Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
                 Text(s.message, Modifier.padding(start = 12.dp), style = MaterialTheme.typography.titleSmall)
             }
+            s.text?.let { text ->
+                Card(Modifier.fillMaxWidth()) {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(text, Modifier.padding(12.dp).heightIn(max = 360.dp).verticalScroll(rememberScrollState()))
+                    }
+                }
+                OutlinedButton(onClick = {
+                    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Recognised text", text))
+                }, Modifier.fillMaxWidth()) { Text("Copy text") }
+            }
             s.files.forEach { Text("${it.name} · ${formatSize(it.length())}", style = MaterialTheme.typography.bodySmall) }
             if (s.docIds.size == 1) {
                 Button(onClick = { onOpenDocument(s.docIds.first()) }, Modifier.fillMaxWidth()) { Text("Open document") }

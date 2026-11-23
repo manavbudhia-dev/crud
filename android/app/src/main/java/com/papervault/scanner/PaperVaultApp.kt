@@ -2,6 +2,7 @@ package com.papervault.scanner
 
 import android.app.Application
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.papervault.scanner.convert.Converter
 import com.papervault.scanner.data.AppDatabase
 import com.papervault.scanner.data.DocumentRepository
 
@@ -9,6 +10,7 @@ import com.papervault.scanner.data.DocumentRepository
 class AppContainer(app: Application) {
     private val db = AppDatabase.create(app)
     val documents = DocumentRepository(app, db.documentDao())
+    val converter = Converter(app)
 }
 
 class PaperVaultApp : Application() {

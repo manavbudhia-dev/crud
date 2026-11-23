@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Password
@@ -81,6 +82,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.papervault.scanner.data.Document
 import com.papervault.scanner.ui.Routes
+import com.papervault.scanner.convert.OutputFormat
 import com.papervault.scanner.ui.components.ConfirmDeleteDialog
 import com.papervault.scanner.ui.components.PasswordDialog
 import com.papervault.scanner.ui.tools.DocumentPickerDialog
@@ -158,8 +160,11 @@ fun HomeScreen(
         Tool("Sign", Icons.Default.Draw, action = {
             docTool = DocTool("Sign which PDF?") { Routes.annotate(it) }
         }),
-        Tool("PDF to Word", Icons.Default.Description, phase = 5),
+        Tool("PDF to Word", Icons.Default.Description, action = {
+            docTool = DocTool("Convert which PDF?") { Routes.convert(it, OutputFormat.WORD) }
+        }),
         Tool("Docs Vault", Icons.Default.Lock, phase = 6),
+        Tool("All tools", Icons.Default.Apps, action = { onNavigate(Routes.ALL_TOOLS) }),
     )
 
     Scaffold(

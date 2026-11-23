@@ -12,12 +12,21 @@ import com.papervault.scanner.ui.edit.AnnotateScreen
 import com.papervault.scanner.ui.edit.MaskScreen
 import com.papervault.scanner.ui.editor.PageEditorScreen
 import com.papervault.scanner.ui.home.HomeScreen
+import com.papervault.scanner.convert.OutputFormat
+import com.papervault.scanner.ui.tools.AllToolsScreen
+import com.papervault.scanner.ui.tools.ConvertScreen
+import com.papervault.scanner.ui.tools.ImportConvertScreen
+import com.papervault.scanner.ui.tools.ImportKind
 import com.papervault.scanner.ui.tools.PdfTool
 import com.papervault.scanner.ui.tools.PdfToolScreen
 import com.papervault.scanner.ui.viewer.PdfViewerScreen
 
 object Routes {
     const val HOME = "home"
+    const val ALL_TOOLS = "tools"
+    const val VAULT = "vault"
+    fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
+    fun importConvert(kind: ImportKind) = "import/${kind.name}"
     fun detail(id: Long) = "doc/$id"
     fun viewer(id: Long, page: Int = 0) = "doc/$id/view?page=$page"
     fun editor(id: Long) = "doc/$id/edit"
@@ -65,6 +74,21 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
             arguments = listOf(idArg, navArgument("page") { type = NavType.IntType; defaultValue = 0 }),
         ) { e ->
             AnnotateScreen(e.arguments!!.getLong("id"), e.arguments!!.getInt("page"), onBack = back)
+        }
+        composable(Routes.ALL_TOOLS) { AllToolsScreen(onBack = back, onNavigate = navigate) }
+        composable(
+            "doc/{id}/convert?fmt={fmt}",
+            arguments = listOf(idArg, navArgument("fmt") { type = NavType.StringType; defaultValue = "" }),
+        ) { e ->
+            ConvertScreen(
+                docId = e.arguments!!.getLong("id"),
+                initial = e.arguments!!.getString("fmt")?.takeIf { it.isNotEmpty() }?.let { OutputFormat.valueOf(it) },
+                onBack = back,
+                onOpenDocument = openDoc,
+            )
+        }
+        composable("import/{kind}", arguments = listOf(navArgument("kind") { type = NavType.StringType })) { e ->
+            ImportConvertScreen(ImportKind.valueOf(e.arguments!!.getString("kind")!!), onBack = back, onOpenDocument = openDoc)
         }
         composable(
             "tool/{tool}?doc={doc}",

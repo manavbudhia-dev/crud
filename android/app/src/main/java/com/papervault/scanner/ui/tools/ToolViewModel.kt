@@ -22,7 +22,7 @@ sealed interface ToolStatus {
     data object Idle : ToolStatus
     data class Running(val message: String, val progress: Float? = null) : ToolStatus
     /** Finished: [docIds] are new library documents; [files] are exported files to share/save. */
-    data class Done(val message: String, val docIds: List<Long> = emptyList(), val files: List<java.io.File> = emptyList(), val mime: String = "application/pdf") : ToolStatus
+    data class Done(val message: String, val docIds: List<Long> = emptyList(), val files: List<java.io.File> = emptyList(), val mime: String = "application/pdf", val text: String? = null) : ToolStatus
     data class Failed(val message: String) : ToolStatus
 }
 
