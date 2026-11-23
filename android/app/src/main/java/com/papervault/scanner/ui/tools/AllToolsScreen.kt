@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TextSnippet
@@ -54,6 +54,7 @@ import com.papervault.scanner.ui.Routes
 import com.papervault.scanner.ui.components.AppHeader
 import com.papervault.scanner.ui.components.SectionTitle
 import com.papervault.scanner.ui.components.SoftCard
+import com.papervault.scanner.ui.components.enterUp
 import com.papervault.scanner.ui.components.ToolTile
 import com.papervault.scanner.ui.theme.Brand
 import com.papervault.scanner.ui.theme.extra
@@ -102,8 +103,8 @@ fun AllToolsScreen(onNavigate: (String) -> Unit, vm: ToolViewModel = viewModel(k
         AppHeader(settings.initial, onSearch = { onNavigate(Routes.SEARCH) }, onProfile = { onNavigate(Routes.SETTINGS) })
         LazyColumn(contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { SectionTitle("Tools & Features", "Boost your productivity", Modifier.padding(start = 6.dp, bottom = 6.dp)) }
-            items(entries, key = { it.title }) { e ->
-                SoftCard(Modifier.fillMaxWidth(), radius = 18.dp, onClick = { if (e.needsDoc) picking = e else onNavigate(e.route(-1)) }) {
+            itemsIndexed(entries, key = { _, e -> e.title }) { i, e ->
+                SoftCard(Modifier.fillMaxWidth().enterUp((i * 35).coerceAtMost(350)), radius = 18.dp, onClick = { if (e.needsDoc) picking = e else onNavigate(e.route(-1)) }) {
                     Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         ToolTile(e.icon, e.fg, e.bg)
                         Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {

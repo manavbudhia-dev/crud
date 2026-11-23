@@ -90,6 +90,10 @@ import com.papervault.scanner.ui.components.FileTypeTile
 import com.papervault.scanner.ui.components.PdfPageImage
 import com.papervault.scanner.ui.components.RenameDialog
 import com.papervault.scanner.ui.components.SoftCard
+import com.papervault.scanner.ui.components.StarButton
+import com.papervault.scanner.ui.components.bouncyClick
+import com.papervault.scanner.ui.components.enterUp
+import com.papervault.scanner.ui.components.pressScale
 import com.papervault.scanner.ui.components.fileKind
 import com.papervault.scanner.ui.components.relativeTime
 import com.papervault.scanner.ui.theme.Brand
@@ -194,7 +198,7 @@ fun DocumentsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(list, key = { it.id }) { d ->
-                        DocumentGridItem(d, onClick = { onOpenDocument(d.id) }, onStar = { vm.toggleStar(d) })
+                        DocumentGridItem(d, Modifier.animateItem(), onClick = { onOpenDocument(d.id) }, onStar = { vm.toggleStar(d) })
                     }
                 }
                 else -> LazyColumn(
@@ -203,7 +207,7 @@ fun DocumentsScreen(
                 ) {
                     items(list, key = { it.id }) { d ->
                         DocumentListItem(
-                            d, onClick = { onOpenDocument(d.id) }, onStar = { vm.toggleStar(d) },
+                            d, modifier = Modifier.animateItem(), onClick = { onOpenDocument(d.id) }, onStar = { vm.toggleStar(d) },
                             onMore = DocMenuActions(
                                 share = { ShareUtils.shareDocument(context, d) },
                                 rename = { renaming = d },
@@ -218,12 +222,15 @@ fun DocumentsScreen(
         }
 
         if (mode != DocumentsMode.SEARCH) {
+            val fabInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             FloatingActionButton(
                 onClick = { onNavigate(Routes.SCAN) },
+                interactionSource = fabInteraction,
                 shape = CircleShape,
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White,
-                modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 20.dp, bottom = 104.dp).size(66.dp),
+                modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 20.dp, bottom = 104.dp).size(66.dp)
+                    .enterUp(250, 120f).pressScale(fabInteraction, 0.9f),
             ) { Icon(Icons.Default.DocumentScanner, "Scan", Modifier.size(30.dp)) }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
@@ -252,15 +259,20 @@ fun DocumentsScreen(
 @Composable
 private fun Pill(label: String, selected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
+    val bg by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.extra.chip, label = "pillBg",
+    )
+    val fg by androidx.compose.animation.animateColorAsState(if (selected) Color.White else MaterialTheme.extra.ink, label = "pillFg")
+    val elevation by androidx.compose.animation.core.animateDpAsState(if (selected) 8.dp else 0.dp, label = "pillElevation")
     Box(
         Modifier
-            .then(if (selected) Modifier.shadow(8.dp, shape, spotColor = MaterialTheme.colorScheme.primary) else Modifier)
+            .shadow(elevation, shape, spotColor = MaterialTheme.colorScheme.primary)
             .clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.extra.chip)
-            .clickable(onClick = onClick)
+            .background(bg)
+            .bouncyClick(0.94f, onClick)
             .padding(horizontal = 22.dp, vertical = 11.dp),
     ) {
-        Text(label, style = MaterialTheme.typography.titleSmall, color = if (selected) Color.White else MaterialTheme.extra.ink)
+        Text(label, style = MaterialTheme.typography.titleSmall, color = fg)
     }
 }
 
@@ -276,9 +288,9 @@ class DocMenuActions(val share: () -> Unit, val rename: () -> Unit, val folder: 
 
 /** Row card: file-type tile, "Title.pdf", "⏱ 2h ago • 2.4 MB", star, ⋮. */
 @Composable
-fun DocumentListItem(d: Document, onClick: () -> Unit, onStar: () -> Unit, onMore: DocMenuActions?) {
+fun DocumentListItem(d: Document, onClick: () -> Unit, onStar: () -> Unit, onMore: DocMenuActions?, modifier: Modifier = Modifier) {
     var menu by remember { mutableStateOf(false) }
-    SoftCard(Modifier.fillMaxWidth(), onClick = onClick) {
+    SoftCard(modifier.fillMaxWidth(), onClick = onClick) {
         Row(Modifier.padding(start = 14.dp, top = 14.dp, bottom = 14.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             FileTypeTile(d.fileKind())
             Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
@@ -294,13 +306,7 @@ fun DocumentListItem(d: Document, onClick: () -> Unit, onStar: () -> Unit, onMor
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onStar, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            if (d.starred) Icons.Default.Star else Icons.Default.StarBorder,
-                            if (d.starred) "Unstar" else "Star",
-                            tint = if (d.starred) Brand.Star else MaterialTheme.extra.inkSoft,
-                        )
-                    }
+                    StarButton(d.starred, onStar)
                     if (onMore != null) Box {
                         IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.MoreVert, "More", tint = MaterialTheme.extra.ink) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -319,13 +325,11 @@ fun DocumentListItem(d: Document, onClick: () -> Unit, onStar: () -> Unit, onMor
 }
 
 @Composable
-private fun DocumentGridItem(d: Document, onClick: () -> Unit, onStar: () -> Unit) {
-    SoftCard(Modifier.fillMaxWidth(), onClick = onClick) {
+private fun DocumentGridItem(d: Document, modifier: Modifier, onClick: () -> Unit, onStar: () -> Unit) {
+    SoftCard(modifier.fillMaxWidth(), onClick = onClick) {
         Box {
             PdfPageImage(d.filePath, 0, 360, Modifier.fillMaxWidth().aspectRatio(0.8f), contentScale = ContentScale.Crop)
-            IconButton(onClick = onStar, modifier = Modifier.align(Alignment.TopEnd)) {
-                Icon(if (d.starred) Icons.Default.Star else Icons.Default.StarBorder, null, tint = if (d.starred) Brand.Star else MaterialTheme.extra.inkSoft)
-            }
+            StarButton(d.starred, onStar, Modifier.align(Alignment.TopEnd).padding(4.dp))
         }
         Column(Modifier.padding(12.dp)) {
             Text("${d.title}.pdf", style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

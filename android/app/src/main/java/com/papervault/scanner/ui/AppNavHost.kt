@@ -2,6 +2,11 @@ package com.papervault.scanner.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -75,7 +80,24 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
     val currentTab = Tab.entries.firstOrNull { it.route == entry?.destination?.route }
 
     Box(Modifier.fillMaxSize()) {
-    NavHost(navController = nav, startDestination = Routes.HOME) {
+    val tabRoutes = Tab.entries.map { it.route }.toSet()
+    fun isTab(e: androidx.navigation.NavBackStackEntry) = e.destination.route in tabRoutes
+    val ease = androidx.compose.animation.core.FastOutSlowInEasing
+    NavHost(
+        navController = nav,
+        startDestination = Routes.HOME,
+        // Tabs cross-fade; pushed screens slide in from the right with a slight parallax.
+        enterTransition = {
+            if (isTab(initialState) && isTab(targetState)) fadeIn(tween(220))
+            else slideInHorizontally(tween(320, easing = ease)) { it / 3 } + fadeIn(tween(260))
+        },
+        exitTransition = {
+            if (isTab(initialState) && isTab(targetState)) fadeOut(tween(160))
+            else slideOutHorizontally(tween(320, easing = ease)) { -it / 6 } + fadeOut(tween(220))
+        },
+        popEnterTransition = { slideInHorizontally(tween(300, easing = ease)) { -it / 6 } + fadeIn(tween(240)) },
+        popExitTransition = { slideOutHorizontally(tween(300, easing = ease)) { it / 3 } + fadeOut(tween(200)) },
+    ) {
         composable(Tab.HOME.route) {
             HomeScreen(onOpenDocument = openDoc, onNavigate = navigate)
         }
@@ -83,7 +105,11 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
         composable(Tab.STARRED.route) { DocumentsScreen(DocumentsMode.STARRED, openDoc, navigate) }
         composable(Tab.TOOLS.route) { AllToolsScreen(onNavigate = navigate) }
         composable(Routes.SEARCH) { DocumentsScreen(DocumentsMode.SEARCH, openDoc, navigate, onBack = back) }
-        composable(Routes.SCAN) {
+        composable(
+            Routes.SCAN,
+            enterTransition = { androidx.compose.animation.slideInVertically(tween(320, easing = ease)) { it } + fadeIn(tween(200)) },
+            popExitTransition = { androidx.compose.animation.slideOutVertically(tween(280, easing = ease)) { it } + fadeOut(tween(200)) },
+        ) {
             ScanScreen(onClose = back, onCreated = { id -> nav.popBackStack(); openDoc(id) })
         }
         composable("doc/{id}/pages", arguments = listOf(idArg)) { e ->

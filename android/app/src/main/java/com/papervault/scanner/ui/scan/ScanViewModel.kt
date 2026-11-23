@@ -34,30 +34,37 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
     val editing = MutableStateFlow<Int?>(null)
     val busy = MutableStateFlow(false)
     val messages = Channel<String>(Channel.BUFFERED)
-    val done = Channel<Long>(Channel.BUFFERED)
-    private val _done get() = done
-    val doneFlow = done.receiveAsFlow()
+    private val _done = Channel<Long>(Channel.BUFFERED)
+    val doneFlow = _done.receiveAsFlow()
 
-    fun onCaptured(bmp: Bitmap) = viewModelScope.launch {
-        val f = withContext(Dispatchers.IO) {
+    /**
+     * [liveQuad] is the page outline tracked in the preview at the moment of capture; if absent,
+     * detection runs once more on the full photo; failing that, a default inset frame is used.
+     */
+    fun onCaptured(bmp: Bitmap, liveQuad: Quad?, openEditor: Boolean = true) = viewModelScope.launch {
+        val (f, quad) = withContext(Dispatchers.Default) {
             val scaled = downscale(bmp)
-            ScanProcessing.saveJpeg(scaled, File(dir, "${UUID.randomUUID()}.jpg"), 92).also { if (scaled != bmp) scaled.recycle(); bmp.recycle() }
+            val q = liveQuad ?: DocDetectorAndroid.detect(scaled) ?: Quad.inset()
+            ScanProcessing.saveJpeg(scaled, File(dir, "${UUID.randomUUID()}.jpg"), 92).also { if (scaled != bmp) scaled.recycle(); bmp.recycle() } to q
         }
-        pages.update { it + ScanPage(f) }
-        editing.value = pages.value.lastIndex
+        pages.update { it + ScanPage(f, quad = quad) }
+        if (openEditor) editing.value = pages.value.lastIndex
     }
 
     fun onImported(uris: List<Uri>) = viewModelScope.launch {
         busy.value = true
-        val files = withContext(Dispatchers.IO) {
+        val imported = withContext(Dispatchers.IO) {
             uris.mapNotNull { u ->
-                PdfUtils.decodeScaled(app, u, 2400)?.let { b -> ScanProcessing.saveJpeg(b, File(dir, "${UUID.randomUUID()}.jpg")).also { b.recycle() } }
+                PdfUtils.decodeScaled(app, u, 2400)?.let { b ->
+                    val q = DocDetectorAndroid.detect(b) ?: Quad.FULL
+                    ScanPage(ScanProcessing.saveJpeg(b, File(dir, "${UUID.randomUUID()}.jpg")).also { b.recycle() }, quad = q)
+                }
             }
         }
         busy.value = false
-        if (files.isEmpty()) return@launch
-        pages.update { it + files.map { f -> ScanPage(f, quad = Quad.FULL) } }
-        editing.value = pages.value.size - files.size
+        if (imported.isEmpty()) return@launch
+        pages.update { it + imported }
+        editing.value = pages.value.size - imported.size
     }
 
     fun update(index: Int, transform: (ScanPage) -> ScanPage) = pages.update { l -> l.mapIndexed { i, p -> if (i == index) transform(p) else p } }

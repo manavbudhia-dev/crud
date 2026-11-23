@@ -28,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,21 +62,38 @@ fun PaperBottomBar(current: Tab?, onSelect: (Tab) -> Unit, modifier: Modifier = 
     ) {
         Tab.entries.forEach { tab ->
             val selected = tab == current
-            val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.extra.inkSoft
+            val color by androidx.compose.animation.animateColorAsState(
+                if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.extra.inkSoft, label = "tabColor",
+            )
+            val indicator by androidx.compose.animation.core.animateDpAsState(
+                if (selected) 36.dp else 0.dp,
+                androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 500f), label = "tabIndicator",
+            )
+            val iconScale by androidx.compose.animation.core.animateFloatAsState(
+                if (selected) 1.12f else 1f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.45f, stiffness = 600f), label = "tabIcon",
+            )
+            val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
             Column(
                 Modifier
                     .weight(1f)
-                    .clickable(remember { MutableInteractionSource() }, indication = null) { onSelect(tab) },
+                    .clickable(remember { MutableInteractionSource() }, indication = null) {
+                        if (!selected) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                        onSelect(tab)
+                    },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(if (selected) tab.selectedIcon else tab.icon, null, tint = color, modifier = Modifier.size(26.dp))
+                Icon(
+                    if (selected) tab.selectedIcon else tab.icon, null, tint = color,
+                    modifier = Modifier.size(26.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                )
                 Spacer(Modifier.height(3.dp))
                 Text(tab.label, color = color, style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium)
                 Spacer(Modifier.height(5.dp))
                 Box(
-                    Modifier.width(36.dp).height(3.dp).clip(RoundedCornerShape(2.dp))
-                        .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
+                    Modifier.width(indicator).height(3.dp).clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.primary),
                 )
             }
         }

@@ -41,6 +41,14 @@ android {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+        // Release-speed build (R8, no debugging) signed with the debug key so it installs directly.
+        // Use this to judge smoothness: debug builds of Compose apps are much slower.
+        create("staging") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            applicationIdSuffix = ".staging"
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -82,6 +90,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.exifinterface)
     implementation(libs.pdfbox.android)
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)

@@ -103,12 +103,14 @@ fun SoftCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
+    val interaction = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Column(
         modifier
+            .let { if (onClick != null) it.pressScale(interaction) else it }
             .shadow(10.dp, shape, ambientColor = Color(0x1A1E3A8A), spotColor = Color(0x1A1E3A8A))
             .clip(shape)
             .background(MaterialTheme.extra.card)
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
+            .let { if (onClick != null) it.clickable(interaction, androidx.compose.material3.ripple(), onClick = onClick) else it },
         content = content,
     )
 }

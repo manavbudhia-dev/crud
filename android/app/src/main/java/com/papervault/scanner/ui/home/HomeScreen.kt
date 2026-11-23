@@ -58,6 +58,9 @@ import com.papervault.scanner.ui.components.BlobBackground
 import com.papervault.scanner.ui.components.HeroIllustration
 import com.papervault.scanner.ui.components.PasswordDialog
 import com.papervault.scanner.ui.components.SoftCard
+import com.papervault.scanner.ui.components.bouncyClick
+import com.papervault.scanner.ui.components.enterUp
+import com.papervault.scanner.ui.components.pressScale
 import com.papervault.scanner.ui.tools.displayName
 import com.papervault.scanner.ui.theme.extra
 
@@ -93,21 +96,25 @@ fun HomeScreen(
             AppHeader(prefs.initial, onSearch = { onNavigate(Routes.SEARCH) }, onProfile = { onNavigate(Routes.SETTINGS) })
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 24.dp))
 
-            Column(Modifier.padding(horizontal = 28.dp).padding(top = 28.dp)) {
+            Column(Modifier.padding(horizontal = 28.dp).padding(top = 28.dp).enterUp(0)) {
                 Text("Your documents,\nin one place", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.extra.ink)
                 Spacer(Modifier.height(12.dp))
                 Text("Scan, manage and access\nyour PDFs easily.", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.extra.inkSoft)
             }
 
-            HeroIllustration(Modifier.fillMaxWidth().height(200.dp).padding(top = 8.dp))
+            HeroIllustration(Modifier.fillMaxWidth().height(200.dp).padding(top = 8.dp).enterUp(90, 60f))
 
+            val scanInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
             Button(
                 onClick = { onNavigate(Routes.SCAN) },
+                interactionSource = scanInteraction,
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 30.dp, vertical = 16.dp),
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
+                    .enterUp(160)
+                    .pressScale(scanInteraction, 0.94f)
                     .shadow(14.dp, RoundedCornerShape(50), ambientColor = MaterialTheme.colorScheme.primary, spotColor = MaterialTheme.colorScheme.primary),
             ) {
                 Icon(Icons.Default.DocumentScanner, null, Modifier.size(24.dp))
@@ -117,7 +124,7 @@ fun HomeScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(20.dp))
             }
 
-            SoftCard(Modifier.padding(horizontal = 18.dp, vertical = 24.dp).fillMaxWidth(), radius = 26.dp) {
+            SoftCard(Modifier.padding(horizontal = 18.dp, vertical = 24.dp).fillMaxWidth().enterUp(230), radius = 26.dp) {
                 Row(Modifier.height(IntrinsicSize.Min).padding(vertical = 18.dp)) {
                     QuickAction(Icons.Default.Image, "Photo\nto PDF", Modifier.weight(1f)) {
                         pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -136,7 +143,9 @@ fun HomeScreen(
                     TextButton(onClick = { onNavigate(com.papervault.scanner.ui.main.Tab.DOCUMENTS.route) }) { Text("See all") }
                 }
                 Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    recent.forEach { d -> DocumentListItem(d, onClick = { onOpenDocument(d.id) }, onStar = { vm.toggleStar(d) }, onMore = null) }
+                    recent.forEachIndexed { i, d ->
+                        DocumentListItem(d, onClick = { onOpenDocument(d.id) }, onStar = { vm.toggleStar(d) }, onMore = null, modifier = Modifier.enterUp(300 + i * 60))
+                    }
                 }
             }
             Spacer(Modifier.height(120.dp))
@@ -151,7 +160,7 @@ fun HomeScreen(
 
 @Composable
 private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.bouncyClick(0.9f, onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
         Spacer(Modifier.height(10.dp))
         Text(label, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.extra.ink, textAlign = TextAlign.Center)

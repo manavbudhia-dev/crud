@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -60,18 +61,35 @@ fun PdfPageImage(
 ) {
     val file = File(path)
     val version = file.lastModified() xor file.length()
+    // Show a cheap low-res render immediately (or one already cached), then swap in the sharp one.
+    val previewWidth = (renderWidth / 4).coerceAtLeast(120)
     var bitmap by remember(path, version, page, renderWidth) {
-        mutableStateOf(PageCache.peek(PageCache.key(file, page, renderWidth)))
+        mutableStateOf(
+            PageCache.peek(PageCache.key(file, page, renderWidth))
+                ?: PageCache.peek(PageCache.key(file, page, previewWidth)),
+        )
     }
     LaunchedEffect(path, version, page, renderWidth) {
-        if (bitmap == null) bitmap = PageCache.load(file, page, renderWidth)
+        if (bitmap == null && renderWidth > previewWidth * 2) bitmap = PageCache.load(file, page, previewWidth)
+        if (bitmap?.width != renderWidth) PageCache.load(file, page, renderWidth)?.let { bitmap = it }
     }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-        val bmp = bitmap
-        if (bmp != null) {
-            Image(bmp.asImageBitmap(), contentDescription = "Page ${page + 1}", contentScale = contentScale)
-        } else {
-            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        androidx.compose.animation.Crossfade(
+            targetState = bitmap,
+            animationSpec = androidx.compose.animation.core.tween(220),
+            label = "page",
+        ) { bmp ->
+            if (bmp != null) {
+                Image(
+                    bmp.asImageBitmap(), contentDescription = "Page ${page + 1}", contentScale = contentScale,
+                    filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            }
         }
     }
 }
