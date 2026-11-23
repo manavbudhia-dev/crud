@@ -43,7 +43,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.papervault.scanner.ui.components.PdfPageImage
 import com.papervault.scanner.ui.detail.DocumentDetailViewModel
-import com.papervault.scanner.util.ShareUtils
+import com.papervault.scanner.ui.vault.SecureWindow
+import androidx.compose.runtime.LaunchedEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,7 +56,11 @@ fun PdfViewerScreen(
 ) {
     val context = LocalContext.current
     val doc by vm.doc.collectAsStateWithLifecycle()
+    val path by vm.pdfPath.collectAsStateWithLifecycle()
+    val locked by vm.locked.collectAsStateWithLifecycle()
     val d = doc
+    SecureWindow(enabled = d?.inVault == true)
+    LaunchedEffect(locked) { if (locked) onBack() }
     val pager = rememberPagerState(initialPage = initialPage) { d?.pageCount ?: 0 }
     // Render at screen width (capped) so text stays sharp at 1x; zoom scales the bitmap.
     val screenPx = with(LocalDensity.current) { LocalConfiguration.current.screenWidthDp.dp.roundToPx() }
@@ -67,16 +72,17 @@ fun PdfViewerScreen(
                 title = { Text(d?.title ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
                 actions = {
-                    d?.let { IconButton(onClick = { ShareUtils.shareDocument(context, it) }) { Icon(Icons.Default.Share, "Share") } }
+                    d?.let { IconButton(onClick = { vm.share(context, it) }) { Icon(Icons.Default.Share, "Share") } }
                 },
             )
         },
         containerColor = Color(0xFF2B2B2B),
     ) { padding ->
         if (d == null) return@Scaffold
+        val readable = path ?: return@Scaffold
         Box(Modifier.padding(padding).fillMaxSize()) {
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 1) { page ->
-                ZoomablePage { PdfPageImage(d.filePath, page, renderWidth, Modifier.fillMaxWidth().background(Color.White)) }
+                ZoomablePage { PdfPageImage(readable, page, renderWidth, Modifier.fillMaxWidth().background(Color.White)) }
             }
             Surface(
                 color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.8f),

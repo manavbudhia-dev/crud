@@ -163,7 +163,7 @@ fun HomeScreen(
         Tool("PDF to Word", Icons.Default.Description, action = {
             docTool = DocTool("Convert which PDF?") { Routes.convert(it, OutputFormat.WORD) }
         }),
-        Tool("Docs Vault", Icons.Default.Lock, phase = 6),
+        Tool("Docs Vault", Icons.Default.Lock, action = { onNavigate(Routes.vault()) }),
         Tool("All tools", Icons.Default.Apps, action = { onNavigate(Routes.ALL_TOOLS) }),
     )
 

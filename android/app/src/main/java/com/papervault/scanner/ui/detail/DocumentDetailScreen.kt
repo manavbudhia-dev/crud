@@ -66,17 +66,57 @@ import com.papervault.scanner.ui.container
 import com.papervault.scanner.util.ShareUtils
 import com.papervault.scanner.util.formatDate
 import com.papervault.scanner.util.formatSize
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.mapLatest
+import com.papervault.scanner.ui.vault.SecureWindow
+import com.papervault.scanner.vault.VaultManager
+import com.papervault.scanner.vault.VaultState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MoreVert
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class DocumentDetailViewModel(private val repo: DocumentRepository, id: Long) : ViewModel() {
+@OptIn(ExperimentalCoroutinesApi::class)
+class DocumentDetailViewModel(private val repo: DocumentRepository, private val vault: VaultManager, id: Long) : ViewModel() {
     val doc = repo.observe(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** True when this is a vault document and the vault is locked: the screen should close. */
+    val locked = combine(doc, vault.state) { d, s -> d?.inVault == true && s != VaultState.UNLOCKED }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Readable PDF path: the file itself, or a decrypted temporary copy for vault documents. */
+    val pdfPath: StateFlow<String?> = combine(doc, vault.state) { d, s -> d to s }
+        .mapLatest { (d, s) ->
+            when {
+                d == null -> null
+                !d.inVault -> d.filePath
+                s != VaultState.UNLOCKED -> null
+                else -> runCatching { vault.openForViewing(d).absolutePath }.getOrNull()
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     fun rename(d: Document, t: String) = viewModelScope.launch { repo.rename(d, t) }
     suspend fun delete(d: Document) = repo.delete(d)
+    fun moveOutOfVault(d: Document) = viewModelScope.launch { runCatching { vault.moveOut(d) } }
+
+    fun share(context: android.content.Context, d: Document) = viewModelScope.launch {
+        if (d.inVault) {
+            val f = runCatching { vault.exportForSharing(d) }.getOrNull() ?: return@launch
+            vault.keepUnlockedForExternal()
+            ShareUtils.shareFiles(context, listOf(f), "application/pdf")
+        } else {
+            ShareUtils.shareDocument(context, d)
+        }
+    }
 
     companion object {
-        fun factory(id: Long) = viewModelFactory { initializer { DocumentDetailViewModel(container.documents, id) } }
+        fun factory(id: Long) = viewModelFactory { initializer { DocumentDetailViewModel(container.documents, container.vault, id) } }
     }
 }
 
@@ -92,10 +132,17 @@ fun DocumentDetailScreen(
 ) {
     val context = LocalContext.current
     val doc by vm.doc.collectAsStateWithLifecycle()
+    val path by vm.pdfPath.collectAsStateWithLifecycle()
+    val locked by vm.locked.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var toolsMenu by remember { mutableStateOf(false) }
+    var overflow by remember { mutableStateOf(false) }
+    val inVault = doc?.inVault == true
+
+    SecureWindow(enabled = inVault)
+    LaunchedEffect(locked) { if (locked) onBack() }
 
     Scaffold(
         topBar = {
@@ -105,13 +152,33 @@ fun DocumentDetailScreen(
                 actions = {
                     doc?.let { d ->
                         IconButton(onClick = { renaming = true }) { Icon(Icons.Default.Edit, "Rename") }
-                        IconButton(onClick = { deleting = true }) { Icon(Icons.Default.Delete, "Delete") }
+                        Box {
+                            IconButton(onClick = { overflow = true }) { Icon(Icons.Default.MoreVert, "More") }
+                            DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                                if (d.inVault) {
+                                    DropdownMenuItem(text = { Text("Move to library") }, leadingIcon = { Icon(Icons.Default.LockOpen, null) },
+                                        onClick = { overflow = false; vm.moveOutOfVault(d) })
+                                } else {
+                                    DropdownMenuItem(text = { Text("Move to Docs Vault") }, leadingIcon = { Icon(Icons.Default.Lock, null) },
+                                        onClick = { overflow = false; onBack(); onNavigate(Routes.vault(moveDocId = d.id)) })
+                                }
+                                DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Default.Delete, null) },
+                                    onClick = { overflow = false; deleting = true })
+                            }
+                        }
                     }
                 },
             )
         },
         bottomBar = {
             val d = doc ?: return@Scaffold
+            if (d.inVault) {
+                BottomAppBar {
+                    DetailAction(Icons.Default.Share, "Share copy", Modifier.weight(1f)) { vm.share(context, d) }
+                    DetailAction(Icons.Default.LockOpen, "Move to library", Modifier.weight(1f)) { vm.moveOutOfVault(d) }
+                }
+                return@Scaffold
+            }
             BottomAppBar {
                 DetailAction(Icons.Default.EditNote, "Pages", Modifier.weight(1f)) { onNavigate(Routes.editor(d.id)) }
                 DetailAction(Icons.Default.Draw, "Sign", Modifier.weight(1f)) { onNavigate(Routes.annotate(d.id)) }
@@ -129,11 +196,12 @@ fun DocumentDetailScreen(
                     }
                 }
                 DetailAction(Icons.Default.SwapHoriz, "Convert", Modifier.weight(1f)) { onNavigate(Routes.convert(d.id)) }
-                DetailAction(Icons.Default.Share, "Share", Modifier.weight(1f)) { ShareUtils.shareDocument(context, d) }
+                DetailAction(Icons.Default.Share, "Share", Modifier.weight(1f)) { vm.share(context, d) }
             }
         },
     ) { padding ->
         val d = doc ?: return@Scaffold
+        val readable = path ?: return@Scaffold
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 150.dp),
             contentPadding = PaddingValues(16.dp),
@@ -152,7 +220,7 @@ fun DocumentDetailScreen(
                 Card(onClick = { onOpenPage(d.id, page) }) {
                     Box {
                         PdfPageImage(
-                            path = d.filePath,
+                            path = readable,
                             page = page,
                             renderWidth = 400,
                             modifier = Modifier.fillMaxWidth().aspectRatio(0.707f),

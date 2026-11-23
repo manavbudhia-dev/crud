@@ -5,12 +5,16 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.papervault.scanner.convert.Converter
 import com.papervault.scanner.data.AppDatabase
 import com.papervault.scanner.data.DocumentRepository
+import com.papervault.scanner.data.SettingsRepository
+import com.papervault.scanner.vault.VaultManager
 
 /** Manual DI container — small enough that Hilt isn't worth the build cost yet. */
 class AppContainer(app: Application) {
     private val db = AppDatabase.create(app)
     val documents = DocumentRepository(app, db.documentDao())
     val converter = Converter(app)
+    val vault = VaultManager(app, documents)
+    val settings = SettingsRepository(app)
 }
 
 class PaperVaultApp : Application() {
@@ -21,5 +25,6 @@ class PaperVaultApp : Application() {
         super.onCreate()
         PDFBoxResourceLoader.init(applicationContext)
         container = AppContainer(this)
+        container.vault.installAutoLock()
     }
 }

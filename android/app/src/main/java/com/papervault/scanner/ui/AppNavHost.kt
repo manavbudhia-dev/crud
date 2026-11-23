@@ -12,6 +12,7 @@ import com.papervault.scanner.ui.edit.AnnotateScreen
 import com.papervault.scanner.ui.edit.MaskScreen
 import com.papervault.scanner.ui.editor.PageEditorScreen
 import com.papervault.scanner.ui.home.HomeScreen
+import com.papervault.scanner.ui.vault.VaultScreen
 import com.papervault.scanner.convert.OutputFormat
 import com.papervault.scanner.ui.tools.AllToolsScreen
 import com.papervault.scanner.ui.tools.ConvertScreen
@@ -25,6 +26,7 @@ object Routes {
     const val HOME = "home"
     const val ALL_TOOLS = "tools"
     const val VAULT = "vault"
+    fun vault(moveDocId: Long? = null) = "vault?move=${moveDocId ?: -1}"
     fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
     fun importConvert(kind: ImportKind) = "import/${kind.name}"
     fun detail(id: Long) = "doc/$id"
@@ -74,6 +76,13 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
             arguments = listOf(idArg, navArgument("page") { type = NavType.IntType; defaultValue = 0 }),
         ) { e ->
             AnnotateScreen(e.arguments!!.getLong("id"), e.arguments!!.getInt("page"), onBack = back)
+        }
+        composable("vault?move={move}", arguments = listOf(navArgument("move") { type = NavType.LongType; defaultValue = -1L })) { e ->
+            VaultScreen(
+                moveDocId = e.arguments!!.getLong("move").takeIf { it >= 0 },
+                onBack = back,
+                onOpenDocument = { nav.navigate(Routes.detail(it)) },
+            )
         }
         composable(Routes.ALL_TOOLS) { AllToolsScreen(onBack = back, onNavigate = navigate) }
         composable(

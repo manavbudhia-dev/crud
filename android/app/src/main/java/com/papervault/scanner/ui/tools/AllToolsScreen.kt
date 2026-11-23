@@ -84,7 +84,7 @@ fun AllToolsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: ToolVie
         Item("Image to text", Icons.Default.Badge, false) { Routes.importConvert(ImportKind.IMAGE_TO_TEXT) },
         Header("Security"),
         Item("Password protect", Icons.Default.Password, true) { Routes.tool(PdfTool.PROTECT, it) },
-        Item("Docs Vault", Icons.Default.Lock, false) { Routes.VAULT },
+        Item("Docs Vault", Icons.Default.Lock, false) { Routes.vault() },
     )
 
     Scaffold(

@@ -38,6 +38,8 @@ object PageCache {
 
     fun peek(key: String): Bitmap? = cache.get(key)
 
+    fun clear() = cache.evictAll()
+
     suspend fun load(file: File, page: Int, width: Int): Bitmap? {
         val k = key(file, page, width)
         cache.get(k)?.let { return it }
