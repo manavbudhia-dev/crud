@@ -3,6 +3,8 @@ package com.papervault.scanner.ui.detail
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.DropdownMenu
@@ -110,7 +112,9 @@ fun DocumentDetailScreen(
         bottomBar = {
             val d = doc ?: return@Scaffold
             BottomAppBar {
-                DetailAction(Icons.Default.EditNote, "Edit pages", Modifier.weight(1f)) { onNavigate(Routes.editor(d.id)) }
+                DetailAction(Icons.Default.EditNote, "Pages", Modifier.weight(1f)) { onNavigate(Routes.editor(d.id)) }
+                DetailAction(Icons.Default.Draw, "Sign", Modifier.weight(1f)) { onNavigate(Routes.annotate(d.id)) }
+                DetailAction(Icons.Default.VisibilityOff, "Mask", Modifier.weight(1f)) { onNavigate(Routes.mask(d.id)) }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     DetailAction(Icons.Default.Build, "Tools", Modifier.fillMaxWidth()) { toolsMenu = true }
                     DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {

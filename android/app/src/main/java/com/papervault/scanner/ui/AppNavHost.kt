@@ -8,6 +8,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.papervault.scanner.ui.detail.DocumentDetailScreen
+import com.papervault.scanner.ui.edit.AnnotateScreen
+import com.papervault.scanner.ui.edit.MaskScreen
 import com.papervault.scanner.ui.editor.PageEditorScreen
 import com.papervault.scanner.ui.home.HomeScreen
 import com.papervault.scanner.ui.tools.PdfTool
@@ -19,6 +21,8 @@ object Routes {
     fun detail(id: Long) = "doc/$id"
     fun viewer(id: Long, page: Int = 0) = "doc/$id/view?page=$page"
     fun editor(id: Long) = "doc/$id/edit"
+    fun mask(id: Long) = "doc/$id/mask"
+    fun annotate(id: Long, page: Int = 0) = "doc/$id/annotate?page=$page"
     fun tool(tool: PdfTool, docId: Long? = null) = "tool/${tool.name}?doc=${docId ?: -1}"
 }
 
@@ -52,6 +56,15 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
         }
         composable("doc/{id}/edit", arguments = listOf(idArg)) { e ->
             PageEditorScreen(e.arguments!!.getLong("id"), onBack = back, onOpenDocument = openDoc)
+        }
+        composable("doc/{id}/mask", arguments = listOf(idArg)) { e ->
+            MaskScreen(e.arguments!!.getLong("id"), onBack = back, onOpenDocument = openDoc)
+        }
+        composable(
+            "doc/{id}/annotate?page={page}",
+            arguments = listOf(idArg, navArgument("page") { type = NavType.IntType; defaultValue = 0 }),
+        ) { e ->
+            AnnotateScreen(e.arguments!!.getLong("id"), e.arguments!!.getInt("page"), onBack = back)
         }
         composable(
             "tool/{tool}?doc={doc}",

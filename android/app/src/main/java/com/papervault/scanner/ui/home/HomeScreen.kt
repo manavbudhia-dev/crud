@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.Delete
@@ -151,7 +152,12 @@ fun HomeScreen(
         Tool("Protect", Icons.Default.Password, action = {
             docTool = DocTool("Protect which PDF?") { Routes.tool(PdfTool.PROTECT, it) }
         }),
-        Tool("Mask", Icons.Default.VisibilityOff, phase = 4),
+        Tool("Mask", Icons.Default.VisibilityOff, action = {
+            docTool = DocTool("Mask which PDF?") { Routes.mask(it) }
+        }),
+        Tool("Sign", Icons.Default.Draw, action = {
+            docTool = DocTool("Sign which PDF?") { Routes.annotate(it) }
+        }),
         Tool("PDF to Word", Icons.Default.Description, phase = 5),
         Tool("Docs Vault", Icons.Default.Lock, phase = 6),
     )
