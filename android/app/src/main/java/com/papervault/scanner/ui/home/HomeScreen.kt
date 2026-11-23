@@ -26,6 +26,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DocumentScanner
@@ -77,7 +79,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.papervault.scanner.data.Document
+import com.papervault.scanner.ui.Routes
 import com.papervault.scanner.ui.components.ConfirmDeleteDialog
+import com.papervault.scanner.ui.components.PasswordDialog
+import com.papervault.scanner.ui.tools.DocumentPickerDialog
+import com.papervault.scanner.ui.tools.PdfTool
 import com.papervault.scanner.ui.components.PdfPageImage
 import com.papervault.scanner.ui.components.RenameDialog
 import com.papervault.scanner.util.ShareUtils
@@ -87,10 +93,14 @@ import kotlinx.coroutines.launch
 
 private data class Tool(val label: String, val icon: ImageVector, val phase: Int? = null, val action: (() -> Unit)? = null)
 
+/** Tools that operate on one existing document: pick it first, then open the tool. */
+private data class DocTool(val title: String, val route: (Long) -> String)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onOpenDocument: (Long) -> Unit,
+    onNavigate: (String) -> Unit,
     vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val context = LocalContext.current
@@ -102,6 +112,8 @@ fun HomeScreen(
     var searching by rememberSaveable { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<Document?>(null) }
     var deleting by remember { mutableStateOf<Document?>(null) }
+    var docTool by remember { mutableStateOf<DocTool?>(null) }
+    val locked by vm.locked.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         vm.events.collect { e ->
@@ -129,8 +141,16 @@ fun HomeScreen(
             pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }),
         Tool("Import PDF", Icons.Default.FileOpen, action = { pickPdf.launch(arrayOf("application/pdf")) }),
-        Tool("Merge", Icons.Default.MergeType, phase = 3),
-        Tool("Split", Icons.AutoMirrored.Filled.CallSplit, phase = 3),
+        Tool("Merge", Icons.Default.MergeType, action = { onNavigate(Routes.tool(PdfTool.MERGE)) }),
+        Tool("Split", Icons.AutoMirrored.Filled.CallSplit, action = {
+            docTool = DocTool("Split which PDF?") { Routes.tool(PdfTool.SPLIT, it) }
+        }),
+        Tool("Compress", Icons.Default.Compress, action = {
+            docTool = DocTool("Compress which PDF?") { Routes.tool(PdfTool.COMPRESS, it) }
+        }),
+        Tool("Protect", Icons.Default.Password, action = {
+            docTool = DocTool("Protect which PDF?") { Routes.tool(PdfTool.PROTECT, it) }
+        }),
         Tool("Mask", Icons.Default.VisibilityOff, phase = 4),
         Tool("PDF to Word", Icons.Default.Description, phase = 5),
         Tool("Docs Vault", Icons.Default.Lock, phase = 6),
@@ -220,6 +240,19 @@ fun HomeScreen(
 
     renaming?.let { doc ->
         RenameDialog(doc.title, onDismiss = { renaming = null }) { vm.rename(doc, it); renaming = null }
+    }
+    docTool?.let { t ->
+        DocumentPickerDialog(t.title, docs.orEmpty(), onDismiss = { docTool = null }) {
+            docTool = null
+            onNavigate(t.route(it.id))
+        }
+    }
+    locked?.let { l ->
+        PasswordDialog(
+            title = "\"${l.title}\" is password-protected",
+            onDismiss = vm::cancelUnlock,
+            onConfirm = vm::unlockImport,
+        )
     }
     deleting?.let { doc ->
         ConfirmDeleteDialog(doc.title, onDismiss = { deleting = null }) { vm.delete(doc); deleting = null }

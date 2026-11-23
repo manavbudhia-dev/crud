@@ -34,3 +34,30 @@ fun ConfirmDeleteDialog(title: String, onDismiss: () -> Unit, onConfirm: () -> U
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+@Composable
+fun PasswordDialog(
+    title: String,
+    message: String = "Enter the password to open this PDF.",
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var text by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                Text(message)
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(text) }, enabled = text.isNotEmpty()) { Text("Unlock") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}

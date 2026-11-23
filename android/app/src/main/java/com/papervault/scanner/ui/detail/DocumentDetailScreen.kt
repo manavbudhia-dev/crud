@@ -1,6 +1,15 @@
 package com.papervault.scanner.ui.detail
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.papervault.scanner.ui.Routes
+import com.papervault.scanner.ui.tools.PdfTool
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -75,6 +84,7 @@ fun DocumentDetailScreen(
     docId: Long,
     onBack: () -> Unit,
     onOpenPage: (Long, Int) -> Unit,
+    onNavigate: (String) -> Unit,
     vm: DocumentDetailViewModel = viewModel(key = "doc$docId", factory = DocumentDetailViewModel.factory(docId)),
 ) {
     val context = LocalContext.current
@@ -82,6 +92,7 @@ fun DocumentDetailScreen(
     val scope = rememberCoroutineScope()
     var renaming by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
+    var toolsMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -91,11 +102,29 @@ fun DocumentDetailScreen(
                 actions = {
                     doc?.let { d ->
                         IconButton(onClick = { renaming = true }) { Icon(Icons.Default.Edit, "Rename") }
-                        IconButton(onClick = { ShareUtils.shareDocument(context, d) }) { Icon(Icons.Default.Share, "Share") }
                         IconButton(onClick = { deleting = true }) { Icon(Icons.Default.Delete, "Delete") }
                     }
                 },
             )
+        },
+        bottomBar = {
+            val d = doc ?: return@Scaffold
+            BottomAppBar {
+                DetailAction(Icons.Default.EditNote, "Edit pages", Modifier.weight(1f)) { onNavigate(Routes.editor(d.id)) }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    DetailAction(Icons.Default.Build, "Tools", Modifier.fillMaxWidth()) { toolsMenu = true }
+                    DropdownMenu(expanded = toolsMenu, onDismissRequest = { toolsMenu = false }) {
+                        listOf(PdfTool.MERGE, PdfTool.SPLIT, PdfTool.COMPRESS, PdfTool.PROTECT, PdfTool.PAGE_NUMBERS, PdfTool.WATERMARK)
+                            .forEach { t ->
+                                DropdownMenuItem(text = { Text(t.title) }, onClick = {
+                                    toolsMenu = false
+                                    onNavigate(Routes.tool(t, d.id))
+                                })
+                            }
+                    }
+                }
+                DetailAction(Icons.Default.Share, "Share", Modifier.weight(1f)) { ShareUtils.shareDocument(context, d) }
+            }
         },
     ) { padding ->
         val d = doc ?: return@Scaffold
@@ -148,5 +177,16 @@ fun DocumentDetailScreen(
                 scope.launch { vm.delete(d); onBack() }
             }
         }
+    }
+}
+
+@Composable
+private fun DetailAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 6.dp),
+    ) {
+        Icon(icon, null)
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }

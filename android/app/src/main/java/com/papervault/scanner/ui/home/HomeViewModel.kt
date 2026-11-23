@@ -8,14 +8,15 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.papervault.scanner.data.Document
 import com.papervault.scanner.data.DocumentRepository
 import com.papervault.scanner.data.DocumentSource
+import com.papervault.scanner.data.PasswordRequiredException
+import com.papervault.scanner.pdf.WrongPasswordException
 import com.papervault.scanner.ui.container
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -25,15 +26,42 @@ sealed interface HomeEvent {
     data class Error(val message: String) : HomeEvent
 }
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModel(private val repo: DocumentRepository) : ViewModel() {
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    val documents: StateFlow<List<Document>?> = _query
-        .flatMapLatest { repo.observeDocuments(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+    val documents: StateFlow<List<Document>?> = combine(repo.observeLibrary(), _query) { docs, q ->
+        if (q.isBlank()) docs else docs.filter { it.title.contains(q.trim(), ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Set when an imported PDF is password-protected; UI asks for the password. */
+    private val _locked = MutableStateFlow<PasswordRequiredException?>(null)
+    val locked: StateFlow<PasswordRequiredException?> = _locked.asStateFlow()
+
+    fun unlockImport(password: String) {
+        val l = _locked.value ?: return
+        _locked.value = null
+        viewModelScope.launch {
+            _busy.value = true
+            try {
+                _events.send(HomeEvent.Opened(repo.importLocked(l.lockedFile, password, l.title)))
+            } catch (e: WrongPasswordException) {
+                _locked.value = l
+                _events.send(HomeEvent.Error("Incorrect password"))
+            } catch (e: Exception) {
+                l.lockedFile.delete()
+                _events.send(HomeEvent.Error(e.message ?: "Could not unlock PDF"))
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    fun cancelUnlock() {
+        _locked.value?.lockedFile?.delete()
+        _locked.value = null
+    }
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -57,6 +85,8 @@ class HomeViewModel(private val repo: DocumentRepository) : ViewModel() {
             _busy.value = true
             try {
                 _events.send(HomeEvent.Opened(block()))
+            } catch (e: PasswordRequiredException) {
+                _locked.value = e
             } catch (e: Exception) {
                 _events.send(HomeEvent.Error(e.message ?: "Something went wrong"))
             } finally {

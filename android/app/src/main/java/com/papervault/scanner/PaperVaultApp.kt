@@ -1,6 +1,7 @@
 package com.papervault.scanner
 
 import android.app.Application
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.papervault.scanner.data.AppDatabase
 import com.papervault.scanner.data.DocumentRepository
 
@@ -16,6 +17,7 @@ class PaperVaultApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        PDFBoxResourceLoader.init(applicationContext)
         container = AppContainer(this)
     }
 }

@@ -13,6 +13,7 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.exifinterface.media.ExifInterface
+import com.papervault.scanner.data.PageSize
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -28,6 +29,21 @@ object PdfUtils {
         ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             PdfRenderer(pfd).use { it.pageCount }
         }
+
+    /** Displayed page size in points (rotation applied). */
+    fun pageSizePoints(file: File, index: Int): Pair<Float, Float> =
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+            PdfRenderer(pfd).use { r -> r.openPage(index).use { it.width.toFloat() to it.height.toFloat() } }
+        }
+
+    /** Render every page at [targetWidth] px, calling [block] for each; bitmaps are recycled after. */
+    fun forEachPage(file: File, targetWidth: Int, block: (index: Int, bmp: Bitmap) -> Unit) {
+        val count = pageCount(file)
+        for (i in 0 until count) {
+            val bmp = renderPage(file, i, targetWidth) ?: continue
+            try { block(i, bmp) } finally { bmp.recycle() }
+        }
+    }
 
     /**
      * Render one page to a bitmap whose width is [targetWidth] px (height keeps aspect).
@@ -55,20 +71,25 @@ object PdfUtils {
      * Build an A4 PDF from images, one image per page, scaled to fit and centred.
      * Landscape images get a landscape page. EXIF orientation is honoured.
      */
-    fun imagesToPdf(context: Context, uris: List<Uri>, out: File) {
+    fun imagesToPdf(context: Context, uris: List<Uri>, out: File, pageSize: PageSize = PageSize.A4) {
         val doc = PdfDocument()
         try {
             uris.forEachIndexed { i, uri ->
                 val bmp = decodeScaled(context, uri, maxSide = 2400) ?: return@forEachIndexed
                 val landscape = bmp.width > bmp.height
-                val pw = if (landscape) A4_H else A4_W
-                val ph = if (landscape) A4_W else A4_H
+                val (baseW, baseH) = when (pageSize) {
+                    PageSize.A4 -> A4_W to A4_H
+                    PageSize.LETTER -> 612 to 792
+                    PageSize.FIT -> A4_W to max(1, (A4_W.toFloat() * bmp.height / bmp.width).toInt())
+                }
+                val fit = pageSize == PageSize.FIT
+                val pw = if (landscape && !fit) baseH else baseW
+                val ph = if (landscape && !fit) baseW else baseH
+                val margin = if (fit) 0f else MARGIN
                 val page = doc.startPage(PdfDocument.PageInfo.Builder(pw, ph, i + 1).create())
                 val canvas: Canvas = page.canvas
                 canvas.drawColor(Color.WHITE)
-                val availW = pw - 2 * MARGIN
-                val availH = ph - 2 * MARGIN
-                val scale = min(availW / bmp.width, availH / bmp.height)
+                val scale = min((pw - 2 * margin) / bmp.width, (ph - 2 * margin) / bmp.height)
                 val w = bmp.width * scale
                 val h = bmp.height * scale
                 val left = (pw - w) / 2
@@ -83,7 +104,7 @@ object PdfUtils {
         }
     }
 
-    private fun decodeScaled(context: Context, uri: Uri, maxSide: Int): Bitmap? {
+    fun decodeScaled(context: Context, uri: Uri, maxSide: Int): Bitmap? {
         val resolver = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }

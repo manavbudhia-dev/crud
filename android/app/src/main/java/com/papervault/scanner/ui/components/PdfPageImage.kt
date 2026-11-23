@@ -34,12 +34,12 @@ object PageCache {
     // PdfRenderer is not thread-safe per file; serialise renders to keep memory predictable.
     private val renderLock = Mutex()
 
-    fun key(path: String, modified: Long, page: Int, width: Int) = "$path:$modified:$page:$width"
+    fun key(file: File, page: Int, width: Int) = "${file.absolutePath}:${file.lastModified()}:${file.length()}:$page:$width"
 
     fun peek(key: String): Bitmap? = cache.get(key)
 
     suspend fun load(file: File, page: Int, width: Int): Bitmap? {
-        val k = key(file.absolutePath, file.lastModified(), page, width)
+        val k = key(file, page, width)
         cache.get(k)?.let { return it }
         return renderLock.withLock {
             cache.get(k) ?: withContext(Dispatchers.IO) { PdfUtils.renderPage(file, page, width) }
@@ -56,11 +56,12 @@ fun PdfPageImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
 ) {
-    val file = remember(path) { File(path) }
-    var bitmap by remember(path, page, renderWidth) {
-        mutableStateOf(PageCache.peek(PageCache.key(path, file.lastModified(), page, renderWidth)))
+    val file = File(path)
+    val version = file.lastModified() xor file.length()
+    var bitmap by remember(path, version, page, renderWidth) {
+        mutableStateOf(PageCache.peek(PageCache.key(file, page, renderWidth)))
     }
-    LaunchedEffect(path, page, renderWidth) {
+    LaunchedEffect(path, version, page, renderWidth) {
         if (bitmap == null) bitmap = PageCache.load(file, page, renderWidth)
     }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
