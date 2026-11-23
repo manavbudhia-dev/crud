@@ -1,42 +1,41 @@
 package com.papervault.scanner.ui.tools
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TextSnippet
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.DocumentScanner
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material.icons.filled.Password
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,85 +43,80 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.papervault.scanner.PaperVaultApp
 import com.papervault.scanner.convert.OutputFormat
 import com.papervault.scanner.ui.Routes
+import com.papervault.scanner.ui.components.AppHeader
+import com.papervault.scanner.ui.components.SectionTitle
+import com.papervault.scanner.ui.components.SoftCard
+import com.papervault.scanner.ui.components.ToolTile
+import com.papervault.scanner.ui.theme.Brand
+import com.papervault.scanner.ui.theme.extra
 
-private sealed interface Entry
-private data class Header(val title: String) : Entry
-private data class Item(val label: String, val icon: ImageVector, val needsDoc: Boolean, val route: (Long) -> String) : Entry
+private data class ToolEntry(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val fg: Color,
+    val bg: Color,
+    val needsDoc: Boolean,
+    val route: (Long) -> String,
+)
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val entries = listOf(
+    ToolEntry("PDF Editor", "Edit, annotate and more", Icons.Default.EditNote, Brand.Red, Brand.RedSoft, true) { Routes.annotate(it) },
+    ToolEntry("Compress PDF", "Reduce file size", Icons.Default.Compress, Brand.Green, Brand.GreenSoft, true) { Routes.tool(PdfTool.COMPRESS, it) },
+    ToolEntry("Merge PDF", "Combine multiple files", Icons.Default.Layers, Brand.Purple, Brand.PurpleSoft, false) { Routes.tool(PdfTool.MERGE) },
+    ToolEntry("Split PDF", "Divide your PDF", Icons.Default.ContentCut, Brand.Orange, Brand.OrangeSoft, true) { Routes.tool(PdfTool.SPLIT, it) },
+    ToolEntry("Convert to Word", "PDF to DOCX", Icons.Default.Description, Brand.Blue, Brand.BlueSoft, true) { Routes.convert(it, OutputFormat.WORD) },
+    ToolEntry("Mask Content", "Hide private details before sharing", Icons.Default.VisibilityOff, Brand.Pink, Brand.PinkSoft, true) { Routes.mask(it) },
+    ToolEntry("Sign PDF", "Draw and place your signature", Icons.Default.Draw, Brand.Teal, Brand.TealSoft, true) { Routes.annotate(it) },
+    ToolEntry("Organize Pages", "Reorder, rotate, delete pages", Icons.Default.ViewAgenda, Brand.Purple, Brand.PurpleSoft, true) { Routes.editor(it) },
+    ToolEntry("Protect PDF", "Add a password", Icons.Default.Password, Brand.Red, Brand.RedSoft, true) { Routes.tool(PdfTool.PROTECT, it) },
+    ToolEntry("PDF to Images", "Save pages as JPG or PNG", Icons.Default.Collections, Brand.Orange, Brand.OrangeSoft, true) { Routes.convert(it, OutputFormat.JPG) },
+    ToolEntry("PDF to Excel", "Extract tables to XLSX", Icons.Default.GridOn, Brand.Green, Brand.GreenSoft, true) { Routes.convert(it, OutputFormat.EXCEL) },
+    ToolEntry("PDF to PowerPoint", "One slide per page", Icons.Default.Slideshow, Brand.Orange, Brand.OrangeSoft, true) { Routes.convert(it, OutputFormat.POWERPOINT) },
+    ToolEntry("PDF to Text", "Extract text with OCR", Icons.AutoMirrored.Filled.TextSnippet, Brand.Blue, Brand.BlueSoft, true) { Routes.convert(it, OutputFormat.TEXT) },
+    ToolEntry("Word to PDF", "DOCX to PDF", Icons.Default.PictureAsPdf, Brand.Red, Brand.RedSoft, false) { Routes.importConvert(ImportKind.WORD_TO_PDF) },
+    ToolEntry("Text to PDF", "TXT to PDF", Icons.Default.TextFields, Brand.Teal, Brand.TealSoft, false) { Routes.importConvert(ImportKind.TEXT_TO_PDF) },
+    ToolEntry("Image to Text", "Recognise text in a photo", Icons.Default.Badge, Brand.Purple, Brand.PurpleSoft, false) { Routes.importConvert(ImportKind.IMAGE_TO_TEXT) },
+    ToolEntry("Page Numbers", "Number every page", Icons.Default.FormatListNumbered, Brand.Blue, Brand.BlueSoft, true) { Routes.tool(PdfTool.PAGE_NUMBERS, it) },
+    ToolEntry("Watermark", "Stamp text across pages", Icons.Default.WaterDrop, Brand.Teal, Brand.TealSoft, true) { Routes.tool(PdfTool.WATERMARK, it) },
+    ToolEntry("Scan Document", "Capture with the camera", Icons.Default.DocumentScanner, Brand.Blue, Brand.BlueSoft, false) { Routes.SCAN },
+    ToolEntry("Docs Vault", "Encrypted, fingerprint-locked storage", Icons.Default.Lock, Brand.Blue, Brand.BlueSoft, false) { Routes.vault() },
+)
+
+/** Tools tab: "Tools & Features" list of coloured tool cards. */
 @Composable
-fun AllToolsScreen(onBack: () -> Unit, onNavigate: (String) -> Unit, vm: ToolViewModel = viewModel(key = "alltools", factory = ToolViewModel.Factory)) {
+fun AllToolsScreen(onNavigate: (String) -> Unit, vm: ToolViewModel = viewModel(key = "alltools", factory = ToolViewModel.Factory)) {
     val library by vm.library.collectAsStateWithLifecycle()
-    var picking by remember { mutableStateOf<Item?>(null) }
+    val settings by (vm.app as PaperVaultApp).container.settings.settings.collectAsStateWithLifecycle()
+    var picking by remember { mutableStateOf<ToolEntry?>(null) }
 
-    val entries = listOf(
-        Header("Edit"),
-        Item("Mask content", Icons.Default.VisibilityOff, true) { Routes.mask(it) },
-        Item("Sign & annotate", Icons.Default.Draw, true) { Routes.annotate(it) },
-        Item("Page numbers", Icons.Default.FormatListNumbered, true) { Routes.tool(PdfTool.PAGE_NUMBERS, it) },
-        Item("Watermark", Icons.Default.WaterDrop, true) { Routes.tool(PdfTool.WATERMARK, it) },
-        Header("Organise"),
-        Item("Merge PDFs", Icons.Default.MergeType, false) { Routes.tool(PdfTool.MERGE) },
-        Item("Split PDF", Icons.AutoMirrored.Filled.CallSplit, true) { Routes.tool(PdfTool.SPLIT, it) },
-        Item("Compress", Icons.Default.Compress, true) { Routes.tool(PdfTool.COMPRESS, it) },
-        Header("Convert from PDF"),
-        Item("PDF to Word", Icons.Default.Description, true) { Routes.convert(it, OutputFormat.WORD) },
-        Item("PDF to images", Icons.Default.Collections, true) { Routes.convert(it, OutputFormat.JPG) },
-        Item("PDF to text", Icons.AutoMirrored.Filled.TextSnippet, true) { Routes.convert(it, OutputFormat.TEXT) },
-        Item("PDF to Excel", Icons.Default.GridOn, true) { Routes.convert(it, OutputFormat.EXCEL) },
-        Item("PDF to PowerPoint", Icons.Default.Slideshow, true) { Routes.convert(it, OutputFormat.POWERPOINT) },
-        Header("Convert to PDF / text"),
-        Item("Word to PDF", Icons.Default.PictureAsPdf, false) { Routes.importConvert(ImportKind.WORD_TO_PDF) },
-        Item("Text to PDF", Icons.Default.TextFields, false) { Routes.importConvert(ImportKind.TEXT_TO_PDF) },
-        Item("Image to text", Icons.Default.Badge, false) { Routes.importConvert(ImportKind.IMAGE_TO_TEXT) },
-        Header("Security"),
-        Item("Password protect", Icons.Default.Password, true) { Routes.tool(PdfTool.PROTECT, it) },
-        Item("Docs Vault", Icons.Default.Lock, false) { Routes.vault() },
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("All tools") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-            )
-        },
-    ) { padding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(100.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(padding).fillMaxSize(),
-        ) {
-            items(entries, span = { if (it is Header) GridItemSpan(maxLineSpan) else GridItemSpan(1) }) { e ->
-                when (e) {
-                    is Header -> Text(e.title, style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-                    is Item -> Card(onClick = { if (e.needsDoc) picking = e else onNavigate(e.route(-1)) }) {
-                        Column(
-                            Modifier.padding(12.dp).fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(e.icon, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
-                            Text(e.label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+    Column(Modifier.fillMaxSize().background(MaterialTheme.extra.background).statusBarsPadding()) {
+        AppHeader(settings.initial, onSearch = { onNavigate(Routes.SEARCH) }, onProfile = { onNavigate(Routes.SETTINGS) })
+        LazyColumn(contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { SectionTitle("Tools & Features", "Boost your productivity", Modifier.padding(start = 6.dp, bottom = 6.dp)) }
+            items(entries, key = { it.title }) { e ->
+                SoftCard(Modifier.fillMaxWidth(), radius = 18.dp, onClick = { if (e.needsDoc) picking = e else onNavigate(e.route(-1)) }) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ToolTile(e.icon, e.fg, e.bg)
+                        Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
+                            Text(e.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.extra.ink)
+                            Text(e.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.extra.inkSoft)
                         }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = MaterialTheme.extra.ink)
                     }
                 }
             }
         }
     }
     picking?.let { item ->
-        DocumentPickerDialog("Choose a PDF", library, onDismiss = { picking = null }) {
-            picking = null
-            onNavigate(item.route(it.id))
-        }
+        DocumentPickerDialog("Choose a PDF", library, onDismiss = { picking = null }) { picking = null; onNavigate(item.route(it.id)) }
     }
 }

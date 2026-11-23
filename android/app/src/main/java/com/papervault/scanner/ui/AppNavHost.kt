@@ -1,6 +1,18 @@
 package com.papervault.scanner.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.papervault.scanner.ui.home.DocumentsMode
+import com.papervault.scanner.ui.home.DocumentsScreen
+import com.papervault.scanner.ui.main.PaperBottomBar
+import com.papervault.scanner.ui.main.Tab
+import com.papervault.scanner.ui.scan.ScanScreen
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,11 +38,14 @@ import com.papervault.scanner.ui.viewer.PdfViewerScreen
 object Routes {
     const val HOME = "home"
     const val ALL_TOOLS = "tools"
+    const val SEARCH = "search"
+    const val SCAN = "scan"
     const val SETTINGS = "settings"
     fun vault(moveDocId: Long? = null) = "vault?move=${moveDocId ?: -1}"
     fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
     fun importConvert(kind: ImportKind) = "import/${kind.name}"
-    fun detail(id: Long) = "doc/$id"
+    fun detail(id: Long) = "doc/$id/pages"
+    fun open(id: Long) = "doc/$id/view?page=0"
     fun viewer(id: Long, page: Int = 0) = "doc/$id/view?page=$page"
     fun editor(id: Long) = "doc/$id/edit"
     fun mask(id: Long) = "doc/$id/mask"
@@ -43,16 +58,35 @@ private val idArg = navArgument("id") { type = NavType.LongType }
 @Composable
 fun AppNavHost(nav: NavHostController = rememberNavController()) {
     val openDoc: (Long) -> Unit = { id ->
-        nav.navigate(Routes.detail(id)) { launchSingleTop = true }
+        nav.navigate(Routes.open(id)) { launchSingleTop = true }
     }
-    val navigate: (String) -> Unit = { nav.navigate(it) }
+    val selectTab: (Tab) -> Unit = { tab ->
+        nav.navigate(tab.route) {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+    val navigate: (String) -> Unit = { route ->
+        Tab.entries.firstOrNull { it.route == route }?.let(selectTab) ?: nav.navigate(route)
+    }
     val back: () -> Unit = { nav.popBackStack() }
+    val entry by nav.currentBackStackEntryAsState()
+    val currentTab = Tab.entries.firstOrNull { it.route == entry?.destination?.route }
 
+    Box(Modifier.fillMaxSize()) {
     NavHost(navController = nav, startDestination = Routes.HOME) {
-        composable(Routes.HOME) {
+        composable(Tab.HOME.route) {
             HomeScreen(onOpenDocument = openDoc, onNavigate = navigate)
         }
-        composable("doc/{id}", arguments = listOf(idArg)) { e ->
+        composable(Tab.DOCUMENTS.route) { DocumentsScreen(DocumentsMode.ALL, openDoc, navigate) }
+        composable(Tab.STARRED.route) { DocumentsScreen(DocumentsMode.STARRED, openDoc, navigate) }
+        composable(Tab.TOOLS.route) { AllToolsScreen(onNavigate = navigate) }
+        composable(Routes.SEARCH) { DocumentsScreen(DocumentsMode.SEARCH, openDoc, navigate, onBack = back) }
+        composable(Routes.SCAN) {
+            ScanScreen(onClose = back, onCreated = { id -> nav.popBackStack(); openDoc(id) })
+        }
+        composable("doc/{id}/pages", arguments = listOf(idArg)) { e ->
             DocumentDetailScreen(
                 docId = e.arguments!!.getLong("id"),
                 onBack = back,
@@ -64,7 +98,7 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
             "doc/{id}/view?page={page}",
             arguments = listOf(idArg, navArgument("page") { type = NavType.IntType; defaultValue = 0 }),
         ) { e ->
-            PdfViewerScreen(e.arguments!!.getLong("id"), e.arguments!!.getInt("page"), onBack = back)
+            PdfViewerScreen(e.arguments!!.getLong("id"), e.arguments!!.getInt("page"), onBack = back, onNavigate = navigate)
         }
         composable("doc/{id}/edit", arguments = listOf(idArg)) { e ->
             PageEditorScreen(e.arguments!!.getLong("id"), onBack = back, onOpenDocument = openDoc)
@@ -82,11 +116,10 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
             VaultScreen(
                 moveDocId = e.arguments!!.getLong("move").takeIf { it >= 0 },
                 onBack = back,
-                onOpenDocument = { nav.navigate(Routes.detail(it)) },
+                onOpenDocument = { nav.navigate(Routes.open(it)) },
             )
         }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = back, onOpenVault = { nav.navigate(Routes.vault()) }) }
-        composable(Routes.ALL_TOOLS) { AllToolsScreen(onBack = back, onNavigate = navigate) }
         composable(
             "doc/{id}/convert?fmt={fmt}",
             arguments = listOf(idArg, navArgument("fmt") { type = NavType.StringType; defaultValue = "" }),
@@ -115,5 +148,9 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
                 onOpenDocument = openDoc,
             )
         }
+    }
+    if (currentTab != null) {
+        PaperBottomBar(currentTab, selectTab, Modifier.align(Alignment.BottomCenter))
+    }
     }
 }

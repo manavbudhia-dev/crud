@@ -53,12 +53,16 @@ class DocumentRepository(
         }
 
     /** Photo → PDF. */
-    suspend fun createFromImages(uris: List<Uri>, title: String? = null, pageSize: PageSize = PageSize.A4): Long =
-        withContext(Dispatchers.IO) {
-            val out = newPdfFile()
-            PdfUtils.imagesToPdf(context, uris, out, pageSize)
-            register(out, DocumentSource.PHOTOS, title ?: defaultTitle(DocumentSource.PHOTOS))
-        }
+    suspend fun createFromImages(
+        uris: List<Uri>,
+        title: String? = null,
+        pageSize: PageSize = PageSize.A4,
+        source: DocumentSource = DocumentSource.PHOTOS,
+    ): Long = withContext(Dispatchers.IO) {
+        val out = newPdfFile()
+        PdfUtils.imagesToPdf(context, uris, out, pageSize)
+        register(out, source, title ?: defaultTitle(source))
+    }
 
     /** Register a PDF produced by a tool (written via [newWorkFile] or [newPdfFile]). */
     suspend fun addGenerated(file: File, source: DocumentSource, title: String, folder: String? = null): Long =

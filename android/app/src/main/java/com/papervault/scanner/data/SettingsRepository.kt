@@ -13,7 +13,13 @@ data class Settings(
     val pageSize: PageSize = PageSize.A4,
     val sort: SortOrder = SortOrder.RECENT,
     val onboarded: Boolean = false,
-)
+    val profileName: String = "",
+    val profileEmail: String = "",
+    val notifications: Boolean = true,
+    val documentsGrid: Boolean = false,
+) {
+    val initial: String get() = profileName.trim().firstOrNull()?.uppercase() ?: "P"
+}
 
 /** Small app preferences backed by SharedPreferences, exposed as a StateFlow. */
 class SettingsRepository(context: Context) {
@@ -27,6 +33,10 @@ class SettingsRepository(context: Context) {
         pageSize = enumOr(prefs.getString("page_size", null), PageSize.A4),
         sort = enumOr(prefs.getString("sort", null), SortOrder.RECENT),
         onboarded = prefs.getBoolean("onboarded", false),
+        profileName = prefs.getString("profile_name", "").orEmpty(),
+        profileEmail = prefs.getString("profile_email", "").orEmpty(),
+        notifications = prefs.getBoolean("notifications", true),
+        documentsGrid = prefs.getBoolean("documents_grid", false),
     )
 
     fun update(transform: (Settings) -> Settings) {
@@ -36,6 +46,10 @@ class SettingsRepository(context: Context) {
             .putString("page_size", s.pageSize.name)
             .putString("sort", s.sort.name)
             .putBoolean("onboarded", s.onboarded)
+            .putString("profile_name", s.profileName)
+            .putString("profile_email", s.profileEmail)
+            .putBoolean("notifications", s.notifications)
+            .putBoolean("documents_grid", s.documentsGrid)
             .apply()
         _settings.value = s
     }

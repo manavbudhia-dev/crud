@@ -33,6 +33,7 @@ sealed interface HomeEvent {
 sealed interface LibraryFilter {
     data object All : LibraryFilter
     data object Starred : LibraryFilter
+    data object Recent : LibraryFilter
     data class Folder(val name: String) : LibraryFilter
 }
 
@@ -57,11 +58,12 @@ class HomeViewModel(private val repo: DocumentRepository, private val settings: 
                 when (f) {
                     LibraryFilter.All -> true
                     LibraryFilter.Starred -> it.starred
+                    LibraryFilter.Recent -> System.currentTimeMillis() - it.updatedAt < 7L * 86_400_000
                     is LibraryFilter.Folder -> it.folder == f.name
                 }
             }
             .let { seq ->
-                when (s.sort) {
+                if (f == LibraryFilter.Recent) seq.sortedByDescending { it.updatedAt } else when (s.sort) {
                     SortOrder.RECENT -> seq.sortedByDescending { it.updatedAt }
                     SortOrder.CREATED -> seq.sortedByDescending { it.createdAt }
                     SortOrder.NAME -> seq.sortedBy { it.title.lowercase() }
@@ -84,6 +86,8 @@ class HomeViewModel(private val repo: DocumentRepository, private val settings: 
     fun setQuery(q: String) { _query.value = q }
     fun setFilter(f: LibraryFilter) { _filter.value = f }
     fun setSort(s: SortOrder) = settings.update { it.copy(sort = s) }
+    fun setGrid(grid: Boolean) = settings.update { it.copy(documentsGrid = grid) }
+    val prefs = settings.settings
 
     fun onScanned(pdf: Uri) = work { repo.importPdf(pdf, DocumentSource.SCAN).also { inCurrentFolder(it) } }
     fun onPhotosPicked(uris: List<Uri>) {

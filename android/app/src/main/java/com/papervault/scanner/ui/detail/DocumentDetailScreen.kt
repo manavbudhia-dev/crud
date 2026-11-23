@@ -103,6 +103,7 @@ class DocumentDetailViewModel(private val repo: DocumentRepository, private val 
 
     fun rename(d: Document, t: String) = viewModelScope.launch { repo.rename(d, t) }
     suspend fun delete(d: Document) = repo.delete(d)
+    fun keepUnlocked() = vault.keepUnlockedForExternal()
     fun moveOutOfVault(d: Document) = viewModelScope.launch { runCatching { vault.moveOut(d) } }
 
     fun share(context: android.content.Context, d: Document) = viewModelScope.launch {
