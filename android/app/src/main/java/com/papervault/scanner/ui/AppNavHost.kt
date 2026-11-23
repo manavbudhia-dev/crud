@@ -12,6 +12,7 @@ import com.papervault.scanner.ui.edit.AnnotateScreen
 import com.papervault.scanner.ui.edit.MaskScreen
 import com.papervault.scanner.ui.editor.PageEditorScreen
 import com.papervault.scanner.ui.home.HomeScreen
+import com.papervault.scanner.ui.settings.SettingsScreen
 import com.papervault.scanner.ui.vault.VaultScreen
 import com.papervault.scanner.convert.OutputFormat
 import com.papervault.scanner.ui.tools.AllToolsScreen
@@ -25,7 +26,7 @@ import com.papervault.scanner.ui.viewer.PdfViewerScreen
 object Routes {
     const val HOME = "home"
     const val ALL_TOOLS = "tools"
-    const val VAULT = "vault"
+    const val SETTINGS = "settings"
     fun vault(moveDocId: Long? = null) = "vault?move=${moveDocId ?: -1}"
     fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
     fun importConvert(kind: ImportKind) = "import/${kind.name}"
@@ -84,6 +85,7 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
                 onOpenDocument = { nav.navigate(Routes.detail(it)) },
             )
         }
+        composable(Routes.SETTINGS) { SettingsScreen(onBack = back, onOpenVault = { nav.navigate(Routes.vault()) }) }
         composable(Routes.ALL_TOOLS) { AllToolsScreen(onBack = back, onNavigate = navigate) }
         composable(
             "doc/{id}/convert?fmt={fmt}",

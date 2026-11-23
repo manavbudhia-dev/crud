@@ -50,7 +50,10 @@ object PdfOps {
     }
 
     fun merge(files: List<File>, out: File) =
-        assemble(files.flatMap { f -> (0 until PdfUtils.pageCount(f)).map { PageSpec(f, it) } }, out)
+        assemble(files.flatMap { f -> (0 until pageCount(f)).map { PageSpec(f, it) } }, out)
+
+    /** Page count via PdfBox (works for files PdfRenderer can't open, and in JVM tests). */
+    fun pageCount(file: File): Int = PDDocument.load(file).use { it.numberOfPages }
 
     fun extract(file: File, pageIndexes: List<Int>, out: File) =
         assemble(pageIndexes.map { PageSpec(file, it) }, out)

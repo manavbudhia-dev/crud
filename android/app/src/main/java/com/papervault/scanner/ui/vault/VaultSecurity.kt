@@ -11,15 +11,26 @@ import androidx.fragment.app.FragmentActivity
 import com.papervault.scanner.ui.findActivity
 import javax.crypto.Cipher
 
-/** Block screenshots/screen recording and hide content in the recents switcher while shown. */
+/**
+ * Block screenshots/screen recording and hide content in the recents switcher while shown.
+ * Reference-counted: during navigation transitions two secure screens overlap, and the
+ * outgoing one must not clear the flag the incoming one needs.
+ */
 @Composable
 fun SecureWindow(enabled: Boolean = true) {
     val activity = LocalContext.current.findActivity()
     DisposableEffect(enabled) {
-        if (enabled) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { if (enabled) activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        if (enabled) {
+            if (secureCount++ == 0) activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            if (enabled && --secureCount == 0) activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 }
+
+// Only touched from the main thread (composition effects).
+private var secureCount = 0
 
 /** Show the system biometric prompt bound to [cipher]; returns the authenticated cipher. */
 fun showBiometricPrompt(
