@@ -17,6 +17,7 @@ data class Settings(
     val profileEmail: String = "",
     val notifications: Boolean = true,
     val documentsGrid: Boolean = false,
+    val ocrScript: com.papervault.scanner.convert.OcrScript = com.papervault.scanner.convert.OcrScript.LATIN,
 ) {
     val initial: String get() = profileName.trim().firstOrNull()?.uppercase() ?: "P"
 }
@@ -37,6 +38,7 @@ class SettingsRepository(context: Context) {
         profileEmail = prefs.getString("profile_email", "").orEmpty(),
         notifications = prefs.getBoolean("notifications", true),
         documentsGrid = prefs.getBoolean("documents_grid", false),
+        ocrScript = enumOr(prefs.getString("ocr_script", null), com.papervault.scanner.convert.OcrScript.LATIN),
     )
 
     fun update(transform: (Settings) -> Settings) {
@@ -50,6 +52,7 @@ class SettingsRepository(context: Context) {
             .putString("profile_email", s.profileEmail)
             .putBoolean("notifications", s.notifications)
             .putBoolean("documents_grid", s.documentsGrid)
+            .putString("ocr_script", s.ocrScript.name)
             .apply()
         _settings.value = s
     }

@@ -13,6 +13,14 @@ import android.text.TextPaint
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.google.mlkit.vision.text.TextRecognizer
+import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+import com.google.mlkit.common.MlKitException
+import com.google.android.gms.common.moduleinstall.ModuleInstall
+import com.google.android.gms.common.moduleinstall.ModuleInstallRequest
 import com.papervault.scanner.pdf.PdfOps
 import com.papervault.scanner.pdf.PdfUtils
 import kotlinx.coroutines.tasks.await
@@ -29,6 +37,15 @@ enum class OutputFormat(val label: String, val ext: String, val mime: String) {
     POWERPOINT("PowerPoint (.pptx)", "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
 }
 
+/** ML Kit text-recognition scripts. Every non-Latin model also reads Latin text. */
+enum class OcrScript(val label: String, val languages: String) {
+    LATIN("Latin", "English, Spanish, French, German and other Latin-alphabet languages"),
+    DEVANAGARI("Devanagari", "Hindi, Marathi, Nepali, Sanskrit (and English)"),
+    CHINESE("Chinese", "Chinese (and English)"),
+    JAPANESE("Japanese", "Japanese (and English)"),
+    KOREAN("Korean", "Korean (and English)"),
+}
+
 enum class WordMode(val label: String) {
     TEXT("Editable text"),
     LAYOUT("Exact look (page images)"),
@@ -37,11 +54,41 @@ enum class WordMode(val label: String) {
 typealias Progress = (message: String, fraction: Float) -> Unit
 
 /** On-device conversions. OCR uses ML Kit text recognition (Latin script). */
-class Converter(private val context: Context) {
+class Converter(private val context: Context, private val script: () -> OcrScript = { OcrScript.LATIN }) {
 
-    private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    private val recognizers = java.util.concurrent.ConcurrentHashMap<OcrScript, TextRecognizer>()
 
-    suspend fun ocr(bitmap: Bitmap): String = recognizer.process(InputImage.fromBitmap(bitmap, 0)).await().text
+    private fun recognizer(s: OcrScript): TextRecognizer = recognizers.getOrPut(s) {
+        TextRecognition.getClient(
+            when (s) {
+                OcrScript.LATIN -> TextRecognizerOptions.DEFAULT_OPTIONS
+                OcrScript.DEVANAGARI -> DevanagariTextRecognizerOptions.Builder().build()
+                OcrScript.CHINESE -> ChineseTextRecognizerOptions.Builder().build()
+                OcrScript.JAPANESE -> JapaneseTextRecognizerOptions.Builder().build()
+                OcrScript.KOREAN -> KoreanTextRecognizerOptions.Builder().build()
+            },
+        )
+    }
+
+    /**
+     * Recognise text with the user's chosen script. Non-Latin models are downloaded by Google
+     * Play services the first time they're needed; until then ML Kit reports UNAVAILABLE and we
+     * ask Play services to fetch the module.
+     */
+    suspend fun ocr(bitmap: Bitmap, s: OcrScript = script()): String {
+        val r = recognizer(s)
+        return try {
+            r.process(InputImage.fromBitmap(bitmap, 0)).await().text
+        } catch (e: MlKitException) {
+            if (e.errorCode == MlKitException.UNAVAILABLE) {
+                runCatching {
+                    ModuleInstall.getClient(context).installModules(ModuleInstallRequest.newBuilder().addApi(r).build()).await()
+                }
+                throw IllegalStateException("Downloading the ${s.label} text model. Connect to the internet and try again in a minute.")
+            }
+            throw e
+        }
+    }
 
     suspend fun ocrUri(uri: Uri): String {
         val bmp = PdfUtils.decodeScaled(context, uri, maxSide = 2400) ?: throw IllegalArgumentException("Cannot read image")

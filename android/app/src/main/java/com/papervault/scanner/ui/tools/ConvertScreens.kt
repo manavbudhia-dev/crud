@@ -66,6 +66,7 @@ fun ConvertScreen(
                 Text("Recognise text in scanned pages (OCR)", Modifier.weight(1f))
                 Switch(checked = ocr, onCheckedChange = { ocr = it })
             }
+            if (ocr) OcrLanguagePicker()
             Text(
                 "Text is extracted on your device. Complex layouts (columns, tables) come out as plain lines; Excel splits columns on wide gaps.",
                 style = MaterialTheme.typography.bodySmall,
@@ -134,12 +135,13 @@ fun ImportConvertScreen(
     ToolScaffold(kind.title, status, onBack, onOpenDocument, vm::reset) {
         Text(
             when (kind) {
-                ImportKind.IMAGE_TO_TEXT -> "Pick a photo or screenshot. Text is recognised on your device (Latin-script languages)."
+                ImportKind.IMAGE_TO_TEXT -> "Pick a photo or screenshot. Text is recognised on your device."
                 ImportKind.WORD_TO_PDF -> "Pick a .docx file. Text, headings and line breaks are kept; images and complex formatting are not."
                 ImportKind.TEXT_TO_PDF -> "Pick a .txt file to turn into an A4 PDF."
             },
             style = MaterialTheme.typography.bodyMedium,
         )
+        if (kind == ImportKind.IMAGE_TO_TEXT) OcrLanguagePicker()
         Button(onClick = {
             when (kind) {
                 ImportKind.IMAGE_TO_TEXT -> pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -154,3 +156,13 @@ fun displayName(context: Context, uri: Uri): String? =
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
         if (it.moveToFirst()) it.getString(0) else null
     }
+
+/** Text-recognition language, stored in settings and shared by every OCR feature. */
+@Composable
+fun OcrLanguagePicker() {
+    val repo = (LocalContext.current.applicationContext as PaperVaultApp).container.settings
+    val settings by repo.settings.collectAsStateWithLifecycle()
+    OptionGroup("Text language", com.papervault.scanner.convert.OcrScript.entries, settings.ocrScript, { it.languages }) { s ->
+        repo.update { it.copy(ocrScript = s) }
+    }
+}

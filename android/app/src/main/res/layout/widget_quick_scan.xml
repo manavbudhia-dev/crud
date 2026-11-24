@@ -43,6 +43,17 @@
         android:src="@drawable/ic_widget_import" />
 
     <ImageView
+        android:id="@+id/widget_qr"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_chip_bg"
+        android:contentDescription="Scan QR code"
+        android:padding="12dp"
+        android:src="@drawable/ic_widget_qr" />
+
+    <ImageView
         android:id="@+id/widget_vault"
         android:layout_width="0dp"
         android:layout_height="match_parent"

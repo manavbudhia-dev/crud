@@ -9,12 +9,13 @@ import com.papervault.scanner.LaunchRouter
 import com.papervault.scanner.R
 import com.papervault.scanner.ui.Routes
 
-/** Home-screen widget with one-tap Scan, Import and Vault. */
+/** Home-screen widget with one-tap Scan, Import, QR and Vault. */
 class QuickScanWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         val views = RemoteViews(context.packageName, R.layout.widget_quick_scan).apply {
             setOnClickPendingIntent(R.id.widget_scan, pending(context, Routes.SCAN, 10))
             setOnClickPendingIntent(R.id.widget_import, pending(context, Routes.IMPORT_PICKER, 11))
+            setOnClickPendingIntent(R.id.widget_qr, pending(context, Routes.QR, 12))
             setOnClickPendingIntent(R.id.widget_vault, pending(context, Routes.vault(), 13))
         }
         ids.forEach { manager.updateAppWidget(it, views) }

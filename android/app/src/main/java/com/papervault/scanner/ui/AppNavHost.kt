@@ -49,6 +49,7 @@ object Routes {
     const val SEARCH = "search"
     const val SCAN = "scan"
     const val IMPORT_PICKER = "pick"
+    const val QR = "qr"
     const val SETTINGS = "settings"
     fun vault(moveDocId: Long? = null) = "vault?move=${moveDocId ?: -1}"
     fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
@@ -108,6 +109,7 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
         composable(Tab.DOCUMENTS.route) { DocumentsScreen(DocumentsMode.ALL, openDoc, navigate) }
         composable(Tab.STARRED.route) { DocumentsScreen(DocumentsMode.STARRED, openDoc, navigate) }
         composable(Tab.TOOLS.route) { AllToolsScreen(onNavigate = navigate) }
+        composable(Routes.QR) { com.papervault.scanner.ui.qr.QrScreen(onBack = back) }
         composable(Routes.IMPORT_PICKER) { com.papervault.scanner.ui.main.ImportPickerRoute(onDone = back) }
         composable(Routes.SEARCH) { DocumentsScreen(DocumentsMode.SEARCH, openDoc, navigate, onBack = back) }
         composable(

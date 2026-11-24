@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,7 +63,7 @@ import com.papervault.scanner.ui.components.CrownIcon
 import com.papervault.scanner.ui.components.SoftCard
 import com.papervault.scanner.ui.theme.extra
 
-private enum class SettingsDialog { PROFILE, THEME, LANGUAGE, PAGE_SIZE, PREMIUM, ABOUT }
+private enum class SettingsDialog { PROFILE, THEME, LANGUAGE, PAGE_SIZE, PREMIUM, ABOUT, OCR }
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit) {
@@ -126,6 +127,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit) {
             }
             RowDivider()
             SettingRow(Icons.Outlined.Description, "Photo to PDF page size", s.pageSize.label) { dialog = SettingsDialog.PAGE_SIZE }
+            RowDivider()
+            SettingRow(Icons.Outlined.Translate, "Text recognition language", s.ocrScript.label) { dialog = SettingsDialog.OCR }
         }
 
         GroupTitle("Security")
@@ -151,6 +154,9 @@ fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit) {
         }
         SettingsDialog.PAGE_SIZE -> ChoiceDialog("Photo to PDF page size", PageSize.entries, s.pageSize, { it.label }, { dialog = null }) { p ->
             repo.update { it.copy(pageSize = p) }; dialog = null
+        }
+        SettingsDialog.OCR -> ChoiceDialog("Text recognition language", com.papervault.scanner.convert.OcrScript.entries, s.ocrScript, { it.languages }, { dialog = null }) { o ->
+            repo.update { it.copy(ocrScript = o) }; dialog = null
         }
         SettingsDialog.LANGUAGE -> ChoiceDialog("Language", listOf("English"), "English", { it }, { dialog = null }) { dialog = null }
         SettingsDialog.PREMIUM -> InfoDialog("PaperVault Premium", "All features are currently free on this device. Premium plans aren't available yet.") { dialog = null }

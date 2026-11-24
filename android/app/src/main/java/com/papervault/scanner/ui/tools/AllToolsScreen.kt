@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -88,6 +89,7 @@ private val entries = listOf(
     ToolEntry("Image to Text", "Recognise text in a photo", Icons.Default.Badge, Brand.Purple, Brand.PurpleSoft, false) { Routes.importConvert(ImportKind.IMAGE_TO_TEXT) },
     ToolEntry("Page Numbers", "Number every page", Icons.Default.FormatListNumbered, Brand.Blue, Brand.BlueSoft, true) { Routes.tool(PdfTool.PAGE_NUMBERS, it) },
     ToolEntry("Watermark", "Stamp text across pages", Icons.Default.WaterDrop, Brand.Teal, Brand.TealSoft, true) { Routes.tool(PdfTool.WATERMARK, it) },
+    ToolEntry("QR & Barcode", "Scan codes with ML Kit", Icons.Default.QrCodeScanner, Brand.Teal, Brand.TealSoft, false) { Routes.QR },
     ToolEntry("Scan Document", "Capture with the camera", Icons.Default.DocumentScanner, Brand.Blue, Brand.BlueSoft, false) { Routes.SCAN },
     ToolEntry("Docs Vault", "Encrypted, fingerprint-locked storage", Icons.Default.Lock, Brand.Blue, Brand.BlueSoft, false) { Routes.vault() },
 )

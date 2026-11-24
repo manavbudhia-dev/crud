@@ -12,10 +12,10 @@ import com.papervault.scanner.vault.VaultManager
 class AppContainer(app: Application) {
     private val db = AppDatabase.create(app)
     val documents = DocumentRepository(app, db.documentDao())
-    val converter = Converter(app)
     val vault = VaultManager(app, documents)
     val settings = SettingsRepository(app)
     val launches = LaunchRouter()
+    val converter = Converter(app) { settings.settings.value.ocrScript }
 }
 
 class PaperVaultApp : Application() {
