@@ -15,6 +15,7 @@ class AppContainer(app: Application) {
     val converter = Converter(app)
     val vault = VaultManager(app, documents)
     val settings = SettingsRepository(app)
+    val launches = LaunchRouter()
 }
 
 class PaperVaultApp : Application() {

@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">PaperVault</string>
+    <string name="open_with">Open with PaperVault</string>
+    <string name="share_to">Save to PaperVault</string>
+    <string name="tile_scan">Scan document</string>
+    <string name="widget_name">PaperVault quick scan</string>
+    <string name="widget_description">Scan, import or open your vault in one tap</string>
 </resources>

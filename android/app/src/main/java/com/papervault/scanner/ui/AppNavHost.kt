@@ -8,6 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +48,7 @@ object Routes {
     const val ALL_TOOLS = "tools"
     const val SEARCH = "search"
     const val SCAN = "scan"
+    const val IMPORT_PICKER = "pick"
     const val SETTINGS = "settings"
     fun vault(moveDocId: Long? = null) = "vault?move=${moveDocId ?: -1}"
     fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
@@ -104,6 +108,7 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
         composable(Tab.DOCUMENTS.route) { DocumentsScreen(DocumentsMode.ALL, openDoc, navigate) }
         composable(Tab.STARRED.route) { DocumentsScreen(DocumentsMode.STARRED, openDoc, navigate) }
         composable(Tab.TOOLS.route) { AllToolsScreen(onNavigate = navigate) }
+        composable(Routes.IMPORT_PICKER) { com.papervault.scanner.ui.main.ImportPickerRoute(onDone = back) }
         composable(Routes.SEARCH) { DocumentsScreen(DocumentsMode.SEARCH, openDoc, navigate, onBack = back) }
         composable(
             Routes.SCAN,
@@ -178,5 +183,13 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
     if (currentTab != null) {
         PaperBottomBar(currentTab, selectTab, Modifier.align(Alignment.BottomCenter))
     }
+    val snackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    com.papervault.scanner.ui.main.LaunchHandler(
+        onRoute = navigate,
+        onOpenDocument = openDoc,
+        onError = { msg -> scope.launch { snackbar.showSnackbar(msg) } },
+    )
+    androidx.compose.material3.SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp))
     }
 }

@@ -17,7 +17,9 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val settingsRepo = (application as PaperVaultApp).container.settings
+        val container = (application as PaperVaultApp).container
+        val settingsRepo = container.settings
+        if (savedInstanceState == null) container.launches.handle(intent) { contentResolver.getType(it) }
         setContent {
             val settings by settingsRepo.settings.collectAsStateWithLifecycle()
             val dark = when (settings.theme) {
@@ -30,5 +32,11 @@ class MainActivity : FragmentActivity() {
                 else OnboardingScreen(onDone = { settingsRepo.update { it.copy(onboarded = true) } })
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        (application as PaperVaultApp).container.launches.handle(intent) { contentResolver.getType(it) }
     }
 }
