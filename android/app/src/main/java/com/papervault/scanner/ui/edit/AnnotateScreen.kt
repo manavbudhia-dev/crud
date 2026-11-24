@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Draw
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.TextFields
@@ -82,7 +83,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-enum class AnnTool { PEN, HIGHLIGHT, TEXT, SIGN, MOVE, ERASE }
+enum class AnnTool { PEN, HIGHLIGHT, TEXT, SIGN, DATE, MOVE, ERASE }
 
 class AnnotateViewModel(private val repo: DocumentRepository, docId: Long, startPage: Int) : ViewModel() {
     val doc = MutableStateFlow<Document?>(null)
@@ -174,6 +175,8 @@ fun AnnotateScreen(
     var textSize by remember { mutableFloatStateOf(0.03f) }
     var pendingText by remember { mutableStateOf<Pair<Float, Float>?>(null) }
     var pendingSign by remember { mutableStateOf<Pair<Float, Float>?>(null) }
+    var dateUnderSignature by remember { mutableStateOf(true) }
+    val today = remember { java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date()) }
     var confirmExit by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.messages.receiveAsFlow().collect { snackbar.showSnackbar(it) } }
@@ -203,6 +206,7 @@ fun AnnotateScreen(
                 ToolChip("Highlight", Icons.Default.Highlight, tool == AnnTool.HIGHLIGHT) { tool = AnnTool.HIGHLIGHT; color = palette[4] }
                 ToolChip("Text", Icons.Default.TextFields, tool == AnnTool.TEXT) { tool = AnnTool.TEXT }
                 ToolChip("Sign", Icons.Default.Draw, tool == AnnTool.SIGN) { tool = AnnTool.SIGN }
+                ToolChip("Date", Icons.Default.Event, tool == AnnTool.DATE) { tool = AnnTool.DATE }
                 ToolChip("Move", Icons.Default.OpenWith, tool == AnnTool.MOVE) { tool = AnnTool.MOVE }
                 ToolChip("Erase", Icons.Default.AutoFixNormal, tool == AnnTool.ERASE) { tool = AnnTool.ERASE }
             }
@@ -218,7 +222,11 @@ fun AnnotateScreen(
             when (tool) {
                 AnnTool.PEN, AnnTool.HIGHLIGHT -> LabeledSlider("Thickness", width, 0.002f..0.03f) { width = it }
                 AnnTool.TEXT -> LabeledSlider("Text size", textSize, 0.015f..0.08f) { textSize = it }
-                AnnTool.SIGN -> HelpText("Tap where the signature should go. Use Move to drag it after placing.")
+                AnnTool.SIGN -> Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Text("Tap where the signature goes.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    FilterChip(selected = dateUnderSignature, onClick = { dateUnderSignature = !dateUnderSignature }, label = { Text("Add date below") })
+                }
+                AnnTool.DATE -> HelpText("Tap to stamp today's date ($today).")
                 AnnTool.MOVE -> HelpText("Drag a text box or signature to move it.")
                 AnnTool.ERASE -> HelpText("Tap an annotation to remove it.")
             }
@@ -247,6 +255,10 @@ fun AnnotateScreen(
                             )
                             AnnTool.TEXT -> detectTapGestures { pendingText = norm(it.x, it.y, size) }
                             AnnTool.SIGN -> detectTapGestures { pendingSign = norm(it.x, it.y, size) }
+                            AnnTool.DATE -> detectTapGestures {
+                                val (x, y) = norm(it.x, it.y, size)
+                                vm.add(AnnItem.Text(x, y, today, color.toArgb(), textSize))
+                            }
                             AnnTool.ERASE -> detectTapGestures { val (x, y) = norm(it.x, it.y, size); vm.eraseAt(x, y) }
                             AnnTool.MOVE -> detectDragGestures(
                                 onDragStart = { val (x, y) = norm(it.x, it.y, size); moving = vm.hit(x, y) },
@@ -299,7 +311,15 @@ fun AnnotateScreen(
             val bmp = AnnotationRenderer.loadStamp(file.path)
             if (bmp != null) {
                 val w = 0.3f
-                vm.add(AnnItem.Stamp((x - w / 2).coerceIn(0f, 1f - w), y, file.path, w, bmp.width.toFloat() / bmp.height))
+                val left = (x - w / 2).coerceIn(0f, 1f - w)
+                val aspect = bmp.width.toFloat() / bmp.height
+                vm.add(AnnItem.Stamp(left, y, file.path, w, aspect))
+                if (dateUnderSignature) {
+                    // Stamp height in page-height units = (w / aspect) * (pageWidth / pageHeight).
+                    val pageAspect = vm.aspects.value.getOrNull(vm.page.value) ?: 0.707f
+                    val below = y + w / aspect * pageAspect + 0.005f
+                    vm.add(AnnItem.Text(left, below.coerceAtMost(0.97f), "Signed $today", android.graphics.Color.DKGRAY, 0.018f))
+                }
             }
             pendingSign = null
         }

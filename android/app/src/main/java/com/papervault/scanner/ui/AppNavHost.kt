@@ -59,6 +59,7 @@ object Routes {
     fun viewer(id: Long, page: Int = 0) = "doc/$id/view?page=$page"
     fun editor(id: Long) = "doc/$id/edit"
     fun mask(id: Long) = "doc/$id/mask"
+    fun form(id: Long) = "doc/$id/form"
     fun annotate(id: Long, page: Int = 0) = "doc/$id/annotate?page=$page"
     fun tool(tool: PdfTool, docId: Long? = null) = "tool/${tool.name}?doc=${docId ?: -1}"
 }
@@ -135,6 +136,14 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
         }
         composable("doc/{id}/edit", arguments = listOf(idArg)) { e ->
             PageEditorScreen(e.arguments!!.getLong("id"), onBack = back, onOpenDocument = openDoc)
+        }
+        composable("doc/{id}/form", arguments = listOf(idArg)) { e ->
+            com.papervault.scanner.ui.edit.FormFillScreen(
+                e.arguments!!.getLong("id"),
+                onBack = back,
+                onSaved = { id, sign -> nav.popBackStack(); nav.navigate(if (sign) Routes.annotate(id) else Routes.open(id)) },
+                onAnnotate = { id -> nav.popBackStack(); nav.navigate(Routes.annotate(id)) },
+            )
         }
         composable("doc/{id}/mask", arguments = listOf(idArg)) { e ->
             MaskScreen(e.arguments!!.getLong("id"), onBack = back, onOpenDocument = openDoc)

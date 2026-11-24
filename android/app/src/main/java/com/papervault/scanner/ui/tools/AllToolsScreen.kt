@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -77,6 +78,7 @@ private val entries = listOf(
     ToolEntry("Split PDF", "Divide your PDF", Icons.Default.ContentCut, Brand.Orange, Brand.OrangeSoft, true) { Routes.tool(PdfTool.SPLIT, it) },
     ToolEntry("Convert to Word", "PDF to DOCX", Icons.Default.Description, Brand.Blue, Brand.BlueSoft, true) { Routes.convert(it, OutputFormat.WORD) },
     ToolEntry("Mask Content", "Hide private details before sharing", Icons.Default.VisibilityOff, Brand.Pink, Brand.PinkSoft, true) { Routes.mask(it) },
+    ToolEntry("Fill Form", "Fill in PDF forms, autofill from profile", Icons.Default.Checklist, Brand.Green, Brand.GreenSoft, true) { Routes.form(it) },
     ToolEntry("Sign PDF", "Draw and place your signature", Icons.Default.Draw, Brand.Teal, Brand.TealSoft, true) { Routes.annotate(it) },
     ToolEntry("Organize Pages", "Reorder, rotate, delete pages", Icons.Default.ViewAgenda, Brand.Purple, Brand.PurpleSoft, true) { Routes.editor(it) },
     ToolEntry("Protect PDF", "Add a password", Icons.Default.Password, Brand.Red, Brand.RedSoft, true) { Routes.tool(PdfTool.PROTECT, it) },

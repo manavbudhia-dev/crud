@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Draw
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GridView
@@ -187,6 +188,7 @@ fun PdfViewerScreen(
                 BarAction(Icons.Outlined.Edit, "Edit", Modifier.fillMaxWidth()) { editMenu = true }
                 DropdownMenu(expanded = editMenu, onDismissRequest = { editMenu = false }) {
                     MenuItem(Icons.Outlined.Draw, "Annotate & sign") { editMenu = false; onNavigate(Routes.annotate(dd.id, pager.currentPage)) }
+                    MenuItem(Icons.Outlined.Checklist, "Fill form") { editMenu = false; onNavigate(Routes.form(dd.id)) }
                     MenuItem(Icons.Outlined.ViewAgenda, "Organize pages") { editMenu = false; onNavigate(Routes.editor(dd.id)) }
                     MenuItem(Icons.Outlined.VisibilityOff, "Mask content") { editMenu = false; onNavigate(Routes.mask(dd.id)) }
                 }
