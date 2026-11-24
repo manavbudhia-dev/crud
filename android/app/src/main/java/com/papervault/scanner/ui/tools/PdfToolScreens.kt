@@ -39,6 +39,8 @@ import com.papervault.scanner.data.DocumentSource
 import com.papervault.scanner.pdf.NumberPosition
 import com.papervault.scanner.pdf.PageRanges
 import com.papervault.scanner.pdf.PdfOps
+import com.papervault.scanner.pdf.compress.CompressionEngine
+import com.papervault.scanner.pdf.compress.CompressionLevel
 import com.papervault.scanner.util.formatSize
 import java.io.File
 
@@ -186,30 +188,48 @@ private fun SplitContent(vm: ToolViewModel, doc: Document) {
 
 // ---------------- Compress ----------------
 
-private enum class Level(val label: String, val dpi: Int, val quality: Float) {
-    LOW("Light — best quality (150 dpi)", 150, 0.8f),
-    MEDIUM("Balanced (120 dpi)", 120, 0.65f),
-    HIGH("Strong — smallest file (96 dpi)", 96, 0.5f),
+private enum class CompressMode(val label: String) {
+    SMART("Smart — keep text selectable (recompress images only)"),
+    MAXIMUM("Maximum — rebuild every page as an optimised image"),
 }
 
 @Composable
 private fun CompressContent(vm: ToolViewModel, doc: Document) {
-    var level by rememberSaveable { mutableStateOf(Level.MEDIUM) }
-    OptionGroup("Compression", Level.entries, level, { it.label }) { level = it }
+    var mode by rememberSaveable { mutableStateOf(CompressMode.SMART) }
+    var level by rememberSaveable {
+        mutableStateOf(vm.repo.compressionLevel.takeIf { it != CompressionLevel.OFF } ?: CompressionLevel.BALANCED)
+    }
+    OptionGroup("Method", CompressMode.entries, mode, { it.label }) { mode = it }
+    OptionGroup("Level", CompressionLevel.entries.filter { it != CompressionLevel.OFF }, level, { "${it.label} · ${it.description}" }) { level = it }
     Text(
-        "Pages are re-encoded as images. Ideal for scans and photos; selectable text in digital PDFs becomes part of the image.",
+        if (mode == CompressMode.SMART) "Best for digital PDFs and forms: text, links and fields stay as they are; oversized photos and scans inside are shrunk."
+        else "Best for scans and photos. Black-and-white text pages are stored as 1-bit images, which are very small.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Button(onClick = {
         vm.run("Compressing…") {
+            val src = File(doc.filePath)
             val out = repo.newWorkFile()
-            PdfOps.compress(File(doc.filePath), level.dpi, level.quality, out) { done, total ->
-                progress("Compressing page $done of $total", done.toFloat() / total)
+            var note = ""
+            when (mode) {
+                CompressMode.SMART -> {
+                    val r = CompressionEngine.optimizeImages(src, level, out) { done, total ->
+                        progress("Optimising page $done of $total", done.toFloat() / total)
+                    }
+                    note = if (r.imagesSeen == 0) " · no images to shrink" else " · ${r.imagesRecompressed} of ${r.imagesSeen} images recompressed"
+                }
+                CompressMode.MAXIMUM -> PdfOps.compress(src, level, out) { done, total ->
+                    progress("Compressing page $done of $total", done.toFloat() / total)
+                }
             }
             val newSize = out.length()
+            if (newSize >= doc.sizeBytes) {
+                out.delete()
+                return@run ToolStatus.Done("Already optimised — compressing wouldn't make it smaller (${formatSize(doc.sizeBytes)})$note")
+            }
             val id = repo.addGenerated(out, DocumentSource.EDIT, "${doc.title} (compressed)", doc.folder)
             val saved = 100 - (newSize * 100 / doc.sizeBytes.coerceAtLeast(1))
-            ToolStatus.Done("${formatSize(doc.sizeBytes)} → ${formatSize(newSize)} (${if (saved >= 0) "-$saved" else "+${-saved}"}%)", listOf(id))
+            ToolStatus.Done("${formatSize(doc.sizeBytes)} → ${formatSize(newSize)} (−$saved%)$note", listOf(id))
         }
     }, modifier = Modifier.fillMaxWidth()) { Text("Compress") }
 }

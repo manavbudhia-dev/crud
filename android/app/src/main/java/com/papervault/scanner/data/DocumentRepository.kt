@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import com.papervault.scanner.pdf.PdfOps
 import com.papervault.scanner.pdf.PdfUtils
+import com.papervault.scanner.pdf.compress.CompressionLevel
+import com.papervault.scanner.pdf.compress.PageEncoding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -20,6 +22,8 @@ class PasswordRequiredException(val lockedFile: File, val title: String) : Excep
 class DocumentRepository(
     private val context: Context,
     private val dao: DocumentDao,
+    /** Compression applied to every image-based PDF the app creates. */
+    private val compression: () -> CompressionLevel = { CompressionLevel.BALANCED },
 ) {
     private val docsDir: File = File(context.filesDir, "documents").apply { mkdirs() }
     val workDir: File get() = File(context.cacheDir, "work").apply { mkdirs() }
@@ -62,9 +66,10 @@ class DocumentRepository(
         pageSize: PageSize = PageSize.A4,
         source: DocumentSource = DocumentSource.PHOTOS,
         sizeFor: ((Int) -> PageSize)? = null,
+        hintFor: ((Int) -> PageEncoding?)? = null,
     ): Long = withContext(Dispatchers.IO) {
         val out = newPdfFile()
-        PdfUtils.imagesToPdf(context, uris, out, pageSize, sizeFor)
+        PdfUtils.imagesToPdf(context, uris, out, pageSize, sizeFor, compression(), hintFor)
         register(out, source, title ?: defaultTitle(source))
     }
 
@@ -105,6 +110,8 @@ class DocumentRepository(
 
     /** Insert a row for a file that's already in its final place (used by the vault). */
     suspend fun insertRaw(doc: Document): Long = dao.insert(doc)
+
+    val compressionLevel: CompressionLevel get() = compression()
 
     fun newPdfFile() = File(docsDir, "${UUID.randomUUID()}.pdf")
     fun newWorkFile(ext: String = "pdf") = File(workDir, "${UUID.randomUUID()}.$ext")

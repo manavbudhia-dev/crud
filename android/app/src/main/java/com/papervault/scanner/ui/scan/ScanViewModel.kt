@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.papervault.scanner.data.DocumentRepository
 import com.papervault.scanner.data.DocumentSource
 import com.papervault.scanner.data.PageSize
+import com.papervault.scanner.pdf.compress.PageEncoding
 import com.papervault.scanner.data.SettingsRepository
 import com.papervault.scanner.pdf.PdfUtils
 import com.papervault.scanner.ui.container
@@ -102,7 +103,10 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
             try {
                 val outs = withContext(Dispatchers.Default) {
                     var n = 0
-                    fun save(b: Bitmap) = ScanProcessing.saveJpeg(b, File(dir, "out_${n++}.jpg"), 88).also { b.recycle() }.toUri()
+                    var currentHint: PageEncoding? = null
+                    val hints = ArrayList<PageEncoding?>()
+                    // Intermediate pages are near-lossless; the compression engine does the real encoding.
+                    fun save(b: Bitmap) = ScanProcessing.saveJpeg(b, File(dir, "out_${n++}.jpg"), 95).also { b.recycle(); hints += currentHint }.toUri()
                     val result = ArrayList<Uri>()
                     val exactA4 = HashSet<Int>()
                     var pendingFront: Bitmap? = null
@@ -111,6 +115,12 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
                         val warped = ScanProcessing.warp(src, p.quad).also { src.recycle() }
                         val rotated = ScanProcessing.rotate(warped, p.rotation).also { if (it != warped) warped.recycle() }
                         val clean = ScanProcessing.process(rotated, p.filter, p.removeShadows).also { if (it != rotated) rotated.recycle() }
+                        currentHint = when {
+                            p.mode == ScanMode.ID_CARD -> null
+                            p.filter == ScanFilter.BW -> PageEncoding.BILEVEL
+                            p.filter == ScanFilter.GRAYSCALE -> PageEncoding.GRAY
+                            else -> null
+                        }
                         when (p.mode) {
                             ScanMode.DOCUMENT -> result += save(clean)
                             ScanMode.BOOK -> ScanLayouts.splitSpread(clean).forEach { half -> result += save(half) }.also { if (!clean.isRecycled) clean.recycle() }
@@ -126,12 +136,12 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
                             exactA4 += result.size; result += save(ScanLayouts.idCardPage(pendingFront!!, null)); pendingFront!!.recycle(); pendingFront = null
                         }
                     }
-                    result to exactA4
+                    Triple(result, exactA4, hints)
                 }
-                val (uris, a4) = outs
+                val (uris, a4, encodingHints) = outs
                 val userSize = settings.settings.value.pageSize
                 // ID-card pages are already A4-shaped at true card size: FIT makes the PDF page exactly A4.
-                val id = repo.createFromImages(uris, pageSize = userSize, source = DocumentSource.SCAN) { i -> if (i in a4) PageSize.FIT else userSize }
+                val id = repo.createFromImages(uris, pageSize = userSize, source = DocumentSource.SCAN, sizeFor = { i -> if (i in a4) PageSize.FIT else userSize }, hintFor = { i -> encodingHints.getOrNull(i) })
                 dir.deleteRecursively()
                 _done.send(id)
             } catch (e: Exception) {

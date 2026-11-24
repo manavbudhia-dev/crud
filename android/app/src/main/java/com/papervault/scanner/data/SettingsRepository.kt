@@ -18,6 +18,7 @@ data class Settings(
     val notifications: Boolean = true,
     val documentsGrid: Boolean = false,
     val ocrScript: com.papervault.scanner.convert.OcrScript = com.papervault.scanner.convert.OcrScript.LATIN,
+    val compression: com.papervault.scanner.pdf.compress.CompressionLevel = com.papervault.scanner.pdf.compress.CompressionLevel.BALANCED,
 ) {
     val initial: String get() = profileName.trim().firstOrNull()?.uppercase() ?: "P"
 }
@@ -39,6 +40,7 @@ class SettingsRepository(context: Context) {
         notifications = prefs.getBoolean("notifications", true),
         documentsGrid = prefs.getBoolean("documents_grid", false),
         ocrScript = enumOr(prefs.getString("ocr_script", null), com.papervault.scanner.convert.OcrScript.LATIN),
+        compression = enumOr(prefs.getString("compression", null), com.papervault.scanner.pdf.compress.CompressionLevel.BALANCED),
     )
 
     fun update(transform: (Settings) -> Settings) {
@@ -53,6 +55,7 @@ class SettingsRepository(context: Context) {
             .putBoolean("notifications", s.notifications)
             .putBoolean("documents_grid", s.documentsGrid)
             .putString("ocr_script", s.ocrScript.name)
+            .putString("compression", s.compression.name)
             .apply()
         _settings.value = s
     }

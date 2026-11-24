@@ -85,7 +85,7 @@ still needs a hands-on pass on a real phone before release.
 - Folders, starred documents, filter chips, sort (recent / created / name / size)
 - Settings: theme (system/light/dark), photo-to-PDF page size (A4 / Letter / fit), privacy note
 - First-run onboarding; All tools hub
-- 41 unit tests (page ranges, OOXML writers, vault & backup crypto, PdfBox ops & forms, edge detector, shadow removal, screenshots)
+- 51 unit tests (page ranges, OOXML writers, vault & backup crypto, PdfBox ops & forms, edge detector, shadow removal, compression engine, screenshots)
 - R8 minified release build (9.4 MB) with keep rules; optional signing via `keystore.properties`
 
 ### Phase 8 — Design refresh & smoothness ✅
@@ -107,6 +107,17 @@ still needs a hands-on pass on a real phone before release.
 - **E. Encrypted backup & restore** (password-derived AES-256; save to Google Drive or anywhere via
   the system picker; optional vault inclusion; duplicate-safe restore)
 
+### Phase 10 — Compression engine ✅
+- Every image-based PDF the app writes (scan, photo to PDF, ID card, masking, Compress tool) goes
+  through `CompressionEngine`: downscale to the level's dpi for the physical page size, analyse
+  content, store as colour JPEG, desaturated JPEG, or 1-bit Flate for black-and-white text
+- Levels in Settings → PDF compression: High quality (300 dpi), Balanced (200 dpi, default),
+  Smallest (150 dpi), Off. B&W and Grayscale scan filters force the matching encoding
+- Compress tool: **Smart** (recompress embedded images only, text/links/fields untouched; ignores
+  all-opaque alpha masks) or **Maximum** (rebuild pages); never keeps a result that isn't smaller
+- Measured in tests: typed page 1.15 MB → 53 KB (Balanced, 1-bit, verified not blank/inverted);
+  digital PDF with a 24 MB embedded image → 94 KB with text intact
+
 ## Known limitations
 
 - ML Kit scanner and OCR need Google Play services (not on e.g. recent Huawei devices).
@@ -119,7 +130,7 @@ still needs a hands-on pass on a real phone before release.
 - PDF → Word/Excel extract text; complex layouts, tables and fonts are not reproduced exactly.
   "Exact look" mode keeps appearance but isn't editable.
 - Word → PDF keeps text, headings and line breaks; images and rich formatting are dropped.
-- Compress and masking rasterise affected pages (text there is no longer selectable).
+- Compress (Maximum) and masking rasterise affected pages (text there is no longer selectable); Compress (Smart) keeps text.
 - Watermark/page-number text supports Latin characters only (standard PDF fonts).
 - Page reordering uses move buttons rather than drag-and-drop.
 

@@ -14,6 +14,13 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import androidx.exifinterface.media.ExifInterface
 import com.papervault.scanner.data.PageSize
+import com.papervault.scanner.pdf.compress.CompressionEngine
+import com.papervault.scanner.pdf.compress.CompressionLevel
+import com.papervault.scanner.pdf.compress.PageEncoding
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -71,37 +78,52 @@ object PdfUtils {
      * Build an A4 PDF from images, one image per page, scaled to fit and centred.
      * Landscape images get a landscape page. EXIF orientation is honoured.
      */
-    fun imagesToPdf(context: Context, uris: List<Uri>, out: File, pageSize: PageSize = PageSize.A4, sizeFor: ((Int) -> PageSize)? = null) {
-        val doc = PdfDocument()
-        try {
+    /**
+     * Build a PDF from images, one per page, through the compression engine: each page is
+     * downscaled to the level's dpi and stored as colour JPEG, grey JPEG or 1-bit CCITT,
+     * whichever suits its content. [hintFor] lets callers force an encoding (e.g. the B&W filter).
+     */
+    fun imagesToPdf(
+        context: Context,
+        uris: List<Uri>,
+        out: File,
+        pageSize: PageSize = PageSize.A4,
+        sizeFor: ((Int) -> PageSize)? = null,
+        level: CompressionLevel = CompressionLevel.BALANCED,
+        hintFor: ((Int) -> PageEncoding?)? = null,
+    ) {
+        // High quality needs ~2500 px across A4; other levels need less, so decode smaller and save memory.
+        val maxSide = if (level == CompressionLevel.BEST || level == CompressionLevel.OFF) 3600 else 2600
+        PDDocument().use { doc ->
             uris.forEachIndexed { i, uri ->
-                val bmp = decodeScaled(context, uri, maxSide = 2400) ?: return@forEachIndexed
-                val landscape = bmp.width > bmp.height
-                val ps = sizeFor?.invoke(i) ?: pageSize
-                val (baseW, baseH) = when (ps) {
-                    PageSize.A4 -> A4_W to A4_H
-                    PageSize.LETTER -> 612 to 792
-                    PageSize.FIT -> A4_W to max(1, (A4_W.toFloat() * bmp.height / bmp.width).toInt())
+                val bmp = decodeScaled(context, uri, maxSide = maxSide) ?: return@forEachIndexed
+                try {
+                    val landscape = bmp.width > bmp.height
+                    val ps = sizeFor?.invoke(i) ?: pageSize
+                    val (baseW, baseH) = when (ps) {
+                        PageSize.A4 -> A4_W.toFloat() to A4_H.toFloat()
+                        PageSize.LETTER -> 612f to 792f
+                        PageSize.FIT -> A4_W.toFloat() to max(1f, A4_W.toFloat() * bmp.height / bmp.width)
+                    }
+                    val fit = ps == PageSize.FIT
+                    val pw = if (landscape && !fit) baseH else baseW
+                    val ph = if (landscape && !fit) baseW else baseH
+                    val margin = if (fit) 0f else MARGIN
+                    val scale = min((pw - 2 * margin) / bmp.width, (ph - 2 * margin) / bmp.height)
+                    val w = bmp.width * scale
+                    val h = bmp.height * scale
+                    val page = PDPage(PDRectangle(pw, ph))
+                    doc.addPage(page)
+                    // The image only covers w points, so size pixels for that width, not the whole page.
+                    val encoded = CompressionEngine.encodePage(doc, bmp, w, level, hintFor?.invoke(i))
+                    PDPageContentStream(doc, page).use { cs -> cs.drawImage(encoded.image, (pw - w) / 2, (ph - h) / 2, w, h) }
+                } finally {
+                    bmp.recycle()
                 }
-                val fit = ps == PageSize.FIT
-                val pw = if (landscape && !fit) baseH else baseW
-                val ph = if (landscape && !fit) baseW else baseH
-                val margin = if (fit) 0f else MARGIN
-                val page = doc.startPage(PdfDocument.PageInfo.Builder(pw, ph, i + 1).create())
-                val canvas: Canvas = page.canvas
-                canvas.drawColor(Color.WHITE)
-                val scale = min((pw - 2 * margin) / bmp.width, (ph - 2 * margin) / bmp.height)
-                val w = bmp.width * scale
-                val h = bmp.height * scale
-                val left = (pw - w) / 2
-                val top = (ph - h) / 2
-                canvas.drawBitmap(bmp, null, RectF(left, top, left + w, top + h), Paint(Paint.FILTER_BITMAP_FLAG))
-                doc.finishPage(page)
-                bmp.recycle()
             }
-            out.outputStream().use { doc.writeTo(it) }
-        } finally {
-            doc.close()
+            val tmp = File(out.parentFile, out.name + ".tmp")
+            doc.save(tmp)
+            if (!tmp.renameTo(out)) { tmp.copyTo(out, true); tmp.delete() }
         }
     }
 

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Compress
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
@@ -64,7 +65,7 @@ import com.papervault.scanner.ui.components.CrownIcon
 import com.papervault.scanner.ui.components.SoftCard
 import com.papervault.scanner.ui.theme.extra
 
-private enum class SettingsDialog { PROFILE, THEME, LANGUAGE, PAGE_SIZE, PREMIUM, ABOUT, OCR }
+private enum class SettingsDialog { PROFILE, THEME, LANGUAGE, PAGE_SIZE, PREMIUM, ABOUT, OCR, COMPRESSION }
 
 @Composable
 fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit, onOpenBackup: () -> Unit = {}) {
@@ -129,6 +130,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit, onOpenBackup: ()
             RowDivider()
             SettingRow(Icons.Outlined.Description, "Photo to PDF page size", s.pageSize.label) { dialog = SettingsDialog.PAGE_SIZE }
             RowDivider()
+            SettingRow(Icons.Outlined.Compress, "PDF compression", s.compression.label) { dialog = SettingsDialog.COMPRESSION }
+            RowDivider()
             SettingRow(Icons.Outlined.Translate, "Text recognition language", s.ocrScript.label) { dialog = SettingsDialog.OCR }
         }
 
@@ -158,6 +161,10 @@ fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit, onOpenBackup: ()
         SettingsDialog.PAGE_SIZE -> ChoiceDialog("Photo to PDF page size", PageSize.entries, s.pageSize, { it.label }, { dialog = null }) { p ->
             repo.update { it.copy(pageSize = p) }; dialog = null
         }
+        SettingsDialog.COMPRESSION -> ChoiceDialog(
+            "Compress new PDFs", com.papervault.scanner.pdf.compress.CompressionLevel.entries, s.compression,
+            { "${it.label} — ${it.description}" }, { dialog = null },
+        ) { c -> repo.update { it.copy(compression = c) }; dialog = null }
         SettingsDialog.OCR -> ChoiceDialog("Text recognition language", com.papervault.scanner.convert.OcrScript.entries, s.ocrScript, { it.languages }, { dialog = null }) { o ->
             repo.update { it.copy(ocrScript = o) }; dialog = null
         }

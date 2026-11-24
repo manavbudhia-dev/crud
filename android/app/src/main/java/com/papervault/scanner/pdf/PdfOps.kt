@@ -14,6 +14,8 @@ import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.util.Matrix
+import com.papervault.scanner.pdf.compress.CompressionEngine
+import com.papervault.scanner.pdf.compress.CompressionLevel
 import java.io.File
 import kotlin.math.max
 
@@ -66,14 +68,19 @@ object PdfOps {
      * Rebuild every page as a JPEG at the given DPI and quality.
      * Large size savings for scans/photos; text in digital PDFs becomes an image.
      */
-    fun compress(file: File, dpi: Int, quality: Float, out: File, onProgress: (Int, Int) -> Unit = { _, _ -> }) {
+    /**
+     * Maximum compression: re-render every page and store it through the compression engine.
+     * Text becomes part of the image; use [CompressionEngine.optimizeImages] to keep text.
+     */
+    fun compress(file: File, level: CompressionLevel, out: File, onProgress: (Int, Int) -> Unit = { _, _ -> }) {
         val count = PdfUtils.pageCount(file)
+        val renderDpi = maxOf(level.dpi, 300)  // render generously; the engine downsamples per content type
         PDDocument().use { target ->
             for (i in 0 until count) {
                 val size = PdfUtils.pageSizePoints(file, i)
-                val widthPx = max(1, (size.first / 72f * dpi).toInt())
+                val widthPx = max(1, (size.first / 72f * renderDpi).toInt()).coerceAtMost(3000)
                 val bmp = PdfUtils.renderPage(file, i, widthPx) ?: continue
-                addImagePage(target, bmp, size.first, size.second, jpegQuality = quality)
+                addImagePage(target, bmp, size.first, size.second, level)
                 bmp.recycle()
                 onProgress(i + 1, count)
             }
@@ -82,11 +89,10 @@ object PdfOps {
     }
 
     /** Append a full-page image page of [w]x[h] points. */
-    fun addImagePage(doc: PDDocument, bmp: Bitmap, w: Float, h: Float, jpegQuality: Float? = 0.9f) {
+    fun addImagePage(doc: PDDocument, bmp: Bitmap, w: Float, h: Float, level: CompressionLevel = CompressionLevel.BALANCED) {
         val page = PDPage(PDRectangle(w, h))
         doc.addPage(page)
-        val img = if (jpegQuality != null) JPEGFactory.createFromImage(doc, bmp, jpegQuality)
-        else LosslessFactory.createFromImage(doc, bmp)
+        val img = CompressionEngine.encodePage(doc, bmp, w, level).image
         PDPageContentStream(doc, page).use { it.drawImage(img, 0f, 0f, w, h) }
     }
 
@@ -212,7 +218,8 @@ object PdfOps {
                         target.importPage(page)
                     } else {
                         val (w, h) = displayedSize(page)
-                        addImagePage(target, bmp, w, h, jpegQuality = 0.92f)
+                        // Masked pages: never 1-bit, so photos/IDs stay readable.
+                        addImagePage(target, bmp, w, h, CompressionLevel.BEST)
                     }
                 }
                 saveAtomically(target, out)

@@ -11,9 +11,9 @@ import com.papervault.scanner.vault.VaultManager
 /** Manual DI container — small enough that Hilt isn't worth the build cost yet. */
 class AppContainer(app: Application) {
     private val db = AppDatabase.create(app)
-    val documents = DocumentRepository(app, db.documentDao())
-    val vault = VaultManager(app, documents)
     val settings = SettingsRepository(app)
+    val documents = DocumentRepository(app, db.documentDao()) { settings.settings.value.compression }
+    val vault = VaultManager(app, documents)
     val launches = LaunchRouter()
     val converter = Converter(app) { settings.settings.value.ocrScript }
     val backup = com.papervault.scanner.backup.BackupManager(app, documents, vault, settings)
