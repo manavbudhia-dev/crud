@@ -58,9 +58,10 @@ class DocumentRepository(
         title: String? = null,
         pageSize: PageSize = PageSize.A4,
         source: DocumentSource = DocumentSource.PHOTOS,
+        sizeFor: ((Int) -> PageSize)? = null,
     ): Long = withContext(Dispatchers.IO) {
         val out = newPdfFile()
-        PdfUtils.imagesToPdf(context, uris, out, pageSize)
+        PdfUtils.imagesToPdf(context, uris, out, pageSize, sizeFor)
         register(out, source, title ?: defaultTitle(source))
     }
 

@@ -292,7 +292,12 @@ private fun CameraView(vm: ScanViewModel, pageCount: Int, onClose: () -> Unit) {
                 IconButton(onClick = openGallery) { Icon(Icons.Outlined.Image, "Import from gallery", tint = Color.White, modifier = Modifier.size(28.dp)) }
             }
 
+            val mode by vm.mode.collectAsStateWithLifecycle()
+            val pagesNow by vm.pages.collectAsStateWithLifecycle()
+            val idSide = if (pagesNow.count { it.mode == ScanMode.ID_CARD } % 2 == 0) "front" else "back"
             val hint = when {
+                mode == ScanMode.ID_CARD -> "Scan the $idSide of the card"
+                mode == ScanMode.BOOK && detected == null -> "Fit both pages in the frame"
                 detected == null -> "Adjust edges for better scan"
                 autoCapture -> "Hold steady — capturing automatically"
                 else -> "Document detected"
@@ -310,6 +315,7 @@ private fun CameraView(vm: ScanViewModel, pageCount: Int, onClose: () -> Unit) {
             }
         }
 
+        ModeSelector(vm)
         // Bottom controls
         Row(
             Modifier.fillMaxWidth().background(Color(0xFF111111)).navigationBarsPadding().padding(horizontal = 36.dp, vertical = 22.dp),
@@ -427,9 +433,12 @@ private fun DrawScope.drawBrackets(alpha: Float) {
 private fun AdjustView(vm: ScanViewModel, index: Int, page: ScanPage, total: Int) {
     val haptics = LocalHapticFeedback.current
     val original by produceState<Bitmap?>(null, page.raw) { value = withContext(Dispatchers.IO) { ScanProcessing.decode(page.raw, 1600) } }
-    val preview by produceState<Bitmap?>(null, original, page.filter) {
+    var processing by remember { mutableStateOf(false) }
+    val preview by produceState<Bitmap?>(null, original, page.filter, page.removeShadows) {
         val o = original
-        value = if (o == null) null else withContext(Dispatchers.Default) { ScanProcessing.filter(o, page.filter) }
+        processing = true
+        value = if (o == null) null else withContext(Dispatchers.Default) { ScanProcessing.process(o, page.filter, page.removeShadows) }
+        processing = false
     }
 
     // Corners live locally while dragging (no ViewModel round-trip per frame); committed on release.
@@ -517,8 +526,13 @@ private fun AdjustView(vm: ScanViewModel, index: Int, page: ScanPage, total: Int
                 }
             }
         }
+        if (processing) androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 40.dp).height(2.dp), color = Brand.Blue)
         Text(
-            "Drag the corners to the document edges", color = Color(0xFFBBBBBB), style = MaterialTheme.typography.bodySmall,
+            when (page.mode) {
+                ScanMode.ID_CARD -> "ID card · drag corners to the card edges"
+                ScanMode.BOOK -> "Book · both pages are split at the centre"
+                ScanMode.DOCUMENT -> "Drag the corners to the document edges"
+            }, color = Color(0xFFBBBBBB), style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
 
@@ -532,6 +546,12 @@ private fun AdjustView(vm: ScanViewModel, index: Int, page: ScanPage, total: Int
                         .clickable { vm.update(index) { it.copy(filter = f) } }.padding(horizontal = 18.dp, vertical = 9.dp),
                 )
             }
+            val shadowBg by animateColorAsState(if (page.removeShadows) Brand.Blue else Color(0xFF2A2A2A), label = "shadow")
+            Text(
+                "Remove shadows", color = Color.White, style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(shadowBg)
+                    .clickable { vm.update(index) { it.copy(removeShadows = !it.removeShadows) } }.padding(horizontal = 18.dp, vertical = 9.dp),
+            )
             Text(
                 "Full image", color = Color(0xFFDDDDDD), style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0xFF2A2A2A))
@@ -552,3 +572,25 @@ private fun AdjustView(vm: ScanViewModel, index: Int, page: ScanPage, total: Int
 
 private fun Offset.isSpecified() = this != Offset.Unspecified && x.isFinite()
 
+
+@Composable
+private fun ModeSelector(vm: ScanViewModel) {
+    val mode by vm.mode.collectAsStateWithLifecycle()
+    val haptics = LocalHapticFeedback.current
+    Row(
+        Modifier.fillMaxWidth().background(Color(0xFF111111)).padding(top = 14.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        ScanMode.entries.forEach { m ->
+            val selected = m == mode
+            val color by animateColorAsState(if (selected) Brand.Star else Color(0xFFBBBBBB), label = "mode")
+            val scale by animateFloatAsState(if (selected) 1.08f else 1f, spring(dampingRatio = 0.5f), label = "modeScale")
+            Text(
+                m.label.uppercase(), color = color, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold,
+                modifier = Modifier.scale(scale).clip(RoundedCornerShape(50))
+                    .clickable { if (!selected) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); vm.mode.value = m } }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+            )
+        }
+    }
+}

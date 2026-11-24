@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.papervault.scanner.data.DocumentRepository
 import com.papervault.scanner.data.DocumentSource
+import com.papervault.scanner.data.PageSize
 import com.papervault.scanner.data.SettingsRepository
 import com.papervault.scanner.pdf.PdfUtils
 import com.papervault.scanner.ui.container
@@ -24,12 +25,20 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
-data class ScanPage(val raw: File, val quad: Quad = Quad.inset(), val filter: ScanFilter = ScanFilter.ENHANCE, val rotation: Int = 0)
+data class ScanPage(
+    val raw: File,
+    val quad: Quad = Quad.inset(),
+    val filter: ScanFilter = ScanFilter.MAGIC,
+    val rotation: Int = 0,
+    val removeShadows: Boolean = true,
+    val mode: ScanMode = ScanMode.DOCUMENT,
+)
 
 class ScanViewModel(private val app: Application, private val repo: DocumentRepository, private val settings: SettingsRepository) : ViewModel() {
     private val dir = File(app.cacheDir, "scan_session").apply { deleteRecursively(); mkdirs() }
 
     val pages = MutableStateFlow<List<ScanPage>>(emptyList())
+    val mode = MutableStateFlow(ScanMode.DOCUMENT)
     /** Index of the page being adjusted, or null while the camera is showing. */
     val editing = MutableStateFlow<Int?>(null)
     val busy = MutableStateFlow(false)
@@ -47,7 +56,7 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
             val q = liveQuad ?: DocDetectorAndroid.detect(scaled) ?: Quad.inset()
             ScanProcessing.saveJpeg(scaled, File(dir, "${UUID.randomUUID()}.jpg"), 92).also { if (scaled != bmp) scaled.recycle(); bmp.recycle() } to q
         }
-        pages.update { it + ScanPage(f, quad = quad) }
+        pages.update { it + ScanPage(f, quad = quad, mode = mode.value) }
         if (openEditor) editing.value = pages.value.lastIndex
     }
 
@@ -57,7 +66,7 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
             uris.mapNotNull { u ->
                 PdfUtils.decodeScaled(app, u, 2400)?.let { b ->
                     val q = DocDetectorAndroid.detect(b) ?: Quad.FULL
-                    ScanPage(ScanProcessing.saveJpeg(b, File(dir, "${UUID.randomUUID()}.jpg")).also { b.recycle() }, quad = q)
+                    ScanPage(ScanProcessing.saveJpeg(b, File(dir, "${UUID.randomUUID()}.jpg")).also { b.recycle() }, quad = q, mode = mode.value)
                 }
             }
         }
@@ -91,16 +100,38 @@ class ScanViewModel(private val app: Application, private val repo: DocumentRepo
         viewModelScope.launch {
             busy.value = true
             try {
-                val outs = withContext(Dispatchers.IO) {
-                    list.mapIndexed { i, p ->
+                val outs = withContext(Dispatchers.Default) {
+                    var n = 0
+                    fun save(b: Bitmap) = ScanProcessing.saveJpeg(b, File(dir, "out_${n++}.jpg"), 88).also { b.recycle() }.toUri()
+                    val result = ArrayList<Uri>()
+                    val exactA4 = HashSet<Int>()
+                    var pendingFront: Bitmap? = null
+                    list.forEachIndexed { i, p ->
                         val src = ScanProcessing.decode(p.raw) ?: error("Could not read page ${i + 1}")
                         val warped = ScanProcessing.warp(src, p.quad).also { src.recycle() }
                         val rotated = ScanProcessing.rotate(warped, p.rotation).also { if (it != warped) warped.recycle() }
-                        val filtered = ScanProcessing.filter(rotated, p.filter).also { if (it != rotated) rotated.recycle() }
-                        ScanProcessing.saveJpeg(filtered, File(dir, "out_$i.jpg"), 88).also { filtered.recycle() }.toUri()
+                        val clean = ScanProcessing.process(rotated, p.filter, p.removeShadows).also { if (it != rotated) rotated.recycle() }
+                        when (p.mode) {
+                            ScanMode.DOCUMENT -> result += save(clean)
+                            ScanMode.BOOK -> ScanLayouts.splitSpread(clean).forEach { half -> result += save(half) }.also { if (!clean.isRecycled) clean.recycle() }
+                            ScanMode.ID_CARD -> {
+                                val front = pendingFront
+                                if (front == null) pendingFront = clean
+                                else { exactA4 += result.size; result += save(ScanLayouts.idCardPage(front, clean)); front.recycle(); clean.recycle(); pendingFront = null }
+                            }
+                        }
+                        // An unpaired ID side followed by a different mode is placed alone.
+                        val nextMode = list.getOrNull(i + 1)?.mode
+                        if (pendingFront != null && nextMode != ScanMode.ID_CARD) {
+                            exactA4 += result.size; result += save(ScanLayouts.idCardPage(pendingFront!!, null)); pendingFront!!.recycle(); pendingFront = null
+                        }
                     }
+                    result to exactA4
                 }
-                val id = repo.createFromImages(outs, pageSize = settings.settings.value.pageSize, source = DocumentSource.SCAN)
+                val (uris, a4) = outs
+                val userSize = settings.settings.value.pageSize
+                // ID-card pages are already A4-shaped at true card size: FIT makes the PDF page exactly A4.
+                val id = repo.createFromImages(uris, pageSize = userSize, source = DocumentSource.SCAN) { i -> if (i in a4) PageSize.FIT else userSize }
                 dir.deleteRecursively()
                 _done.send(id)
             } catch (e: Exception) {

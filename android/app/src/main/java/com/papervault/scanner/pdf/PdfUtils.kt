@@ -71,18 +71,19 @@ object PdfUtils {
      * Build an A4 PDF from images, one image per page, scaled to fit and centred.
      * Landscape images get a landscape page. EXIF orientation is honoured.
      */
-    fun imagesToPdf(context: Context, uris: List<Uri>, out: File, pageSize: PageSize = PageSize.A4) {
+    fun imagesToPdf(context: Context, uris: List<Uri>, out: File, pageSize: PageSize = PageSize.A4, sizeFor: ((Int) -> PageSize)? = null) {
         val doc = PdfDocument()
         try {
             uris.forEachIndexed { i, uri ->
                 val bmp = decodeScaled(context, uri, maxSide = 2400) ?: return@forEachIndexed
                 val landscape = bmp.width > bmp.height
-                val (baseW, baseH) = when (pageSize) {
+                val ps = sizeFor?.invoke(i) ?: pageSize
+                val (baseW, baseH) = when (ps) {
                     PageSize.A4 -> A4_W to A4_H
                     PageSize.LETTER -> 612 to 792
                     PageSize.FIT -> A4_W to max(1, (A4_W.toFloat() * bmp.height / bmp.width).toInt())
                 }
-                val fit = pageSize == PageSize.FIT
+                val fit = ps == PageSize.FIT
                 val pw = if (landscape && !fit) baseH else baseW
                 val ph = if (landscape && !fit) baseW else baseH
                 val margin = if (fit) 0f else MARGIN
