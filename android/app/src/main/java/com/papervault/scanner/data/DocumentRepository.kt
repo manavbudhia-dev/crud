@@ -6,6 +6,7 @@ import com.papervault.scanner.pdf.PdfOps
 import com.papervault.scanner.pdf.PdfUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -24,6 +25,8 @@ class DocumentRepository(
     val workDir: File get() = File(context.cacheDir, "work").apply { mkdirs() }
 
     fun observeLibrary(): Flow<List<Document>> = dao.observeLibrary()
+    suspend fun libraryNow(): List<Document> = dao.observeLibrary().first()
+    suspend fun vaultNow(): List<Document> = dao.observeVault().first()
     fun observeVault(): Flow<List<Document>> = dao.observeVault()
     fun observeFolders(): Flow<List<String>> = dao.observeFolders()
     fun observe(id: Long): Flow<Document?> = dao.observe(id)

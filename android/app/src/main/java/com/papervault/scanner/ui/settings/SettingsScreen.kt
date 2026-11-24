@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -66,7 +67,7 @@ import com.papervault.scanner.ui.theme.extra
 private enum class SettingsDialog { PROFILE, THEME, LANGUAGE, PAGE_SIZE, PREMIUM, ABOUT, OCR }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit, onOpenBackup: () -> Unit = {}) {
     val repo = (LocalContext.current.applicationContext as PaperVaultApp).container.settings
     val s by repo.settings.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
@@ -134,6 +135,8 @@ fun SettingsScreen(onBack: () -> Unit, onOpenVault: () -> Unit) {
         GroupTitle("Security")
         SoftCard(Modifier.padding(horizontal = 18.dp).fillMaxWidth(), radius = 18.dp) {
             SettingRow(Icons.Outlined.Lock, "Docs Vault", "Password & fingerprint", onOpenVault)
+            RowDivider()
+            SettingRow(Icons.Outlined.CloudUpload, "Backup & restore", "Encrypted", onOpenBackup)
         }
 
         GroupTitle("About")

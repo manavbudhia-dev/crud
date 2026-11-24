@@ -16,6 +16,7 @@ class AppContainer(app: Application) {
     val settings = SettingsRepository(app)
     val launches = LaunchRouter()
     val converter = Converter(app) { settings.settings.value.ocrScript }
+    val backup = com.papervault.scanner.backup.BackupManager(app, documents, vault, settings)
 }
 
 class PaperVaultApp : Application() {

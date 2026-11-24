@@ -50,6 +50,7 @@ object Routes {
     const val SCAN = "scan"
     const val IMPORT_PICKER = "pick"
     const val QR = "qr"
+    const val BACKUP = "backup"
     const val SETTINGS = "settings"
     fun vault(moveDocId: Long? = null) = "vault?move=${moveDocId ?: -1}"
     fun convert(id: Long, fmt: OutputFormat? = null) = "doc/$id/convert?fmt=${fmt?.name ?: ""}"
@@ -161,7 +162,10 @@ fun AppNavHost(nav: NavHostController = rememberNavController()) {
                 onOpenDocument = { nav.navigate(Routes.open(it)) },
             )
         }
-        composable(Routes.SETTINGS) { SettingsScreen(onBack = back, onOpenVault = { nav.navigate(Routes.vault()) }) }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(onBack = back, onOpenVault = { nav.navigate(Routes.vault()) }, onOpenBackup = { nav.navigate(Routes.BACKUP) })
+        }
+        composable(Routes.BACKUP) { com.papervault.scanner.ui.settings.BackupScreen(onBack = back, onOpenVault = { nav.navigate(Routes.vault()) }) }
         composable(
             "doc/{id}/convert?fmt={fmt}",
             arguments = listOf(idArg, navArgument("fmt") { type = NavType.StringType; defaultValue = "" }),

@@ -288,6 +288,14 @@ class VaultManager(private val context: Context, private val repo: DocumentRepos
         f
     }
 
+    /** Stream a vault document's plaintext into [out] (used by encrypted backups). */
+    fun decryptInto(doc: Document, out: java.io.OutputStream) {
+        val key = requireKey()
+        BufferedInputStream(File(doc.filePath).inputStream()).use { VaultCrypto.decrypt(key, it, out) }
+    }
+
+    val isUnlocked get() = _state.value == VaultState.UNLOCKED
+
     private fun decryptTo(key: ByteArray, enc: File, out: File) {
         val tmp = File(out.parentFile, out.name + ".part")
         BufferedInputStream(enc.inputStream()).use { input -> tmp.outputStream().use { VaultCrypto.decrypt(key, input, it) } }

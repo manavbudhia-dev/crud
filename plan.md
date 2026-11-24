@@ -85,13 +85,37 @@ still needs a hands-on pass on a real phone before release.
 - Folders, starred documents, filter chips, sort (recent / created / name / size)
 - Settings: theme (system/light/dark), photo-to-PDF page size (A4 / Letter / fit), privacy note
 - First-run onboarding; All tools hub
-- 24 unit tests (page ranges, OOXML writers, vault crypto, PdfBox ops via Robolectric)
+- 41 unit tests (page ranges, OOXML writers, vault & backup crypto, PdfBox ops & forms, edge detector, shadow removal, screenshots)
 - R8 minified release build (9.4 MB) with keep rules; optional signing via `keystore.properties`
+
+### Phase 8 — Design refresh & smoothness ✅
+- UI rebuilt to the PaperVault mockup (blue palette, 4-tab shell, soft cards, viewer bar)
+- Custom CameraX scanner with live paper-edge tracking (own detector, eased outline), auto-capture,
+  draggable corners with magnifier
+- Motion: screen transitions, press feedback, animated tabs/chips/star, staggered entrances
+- `staging` build type (R8 + debug signing) for judging real performance
+
+### Phase 9 — Extra features ✅
+- **A. Open with / Share to PaperVault** (PDFs and images), **home-screen widget** (Scan, Import, QR, Vault),
+  **quick-settings tile** (Scan)
+- **B. Scan modes**: ID card (front + back on one exact-A4 page at true card size), Book (split
+  facing pages); **Magic colour** filter and **shadow / glare removal** (background normalisation)
+- **C. Google ML Kit**: QR & barcode scanner (smart actions, history, scan from photo); text
+  recognition in Latin, Devanagari (Hindi, Marathi, Nepali), Chinese, Japanese, Korean
+- **D. Fill PDF forms** (text, checkbox, radio, dropdown; profile autofill; lock answers) and
+  **sign with date stamp**
+- **E. Encrypted backup & restore** (password-derived AES-256; save to Google Drive or anywhere via
+  the system picker; optional vault inclusion; duplicate-safe restore)
 
 ## Known limitations
 
 - ML Kit scanner and OCR need Google Play services (not on e.g. recent Huawei devices).
-- OCR covers Latin-script languages only (other scripts need extra ML Kit models).
+- ML Kit OCR covers Latin, Devanagari, Chinese, Japanese and Korean. Tamil, Telugu, Bengali,
+  Gujarati, Kannada, Malayalam, Punjabi and Arabic aren't supported by ML Kit. Non-Latin models
+  download through Play services on first use (internet needed once).
+- Backup to Drive is manual (via the system picker). Automatic scheduled Drive backup would need a
+  Google Cloud OAuth client and the Drive API.
+- Live edge detection relies on the page being lighter than the surface behind it.
 - PDF → Word/Excel extract text; complex layouts, tables and fonts are not reproduced exactly.
   "Exact look" mode keeps appearance but isn't editable.
 - Word → PDF keeps text, headings and line breaks; images and rich formatting are dropped.
