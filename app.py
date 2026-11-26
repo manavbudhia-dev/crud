@@ -1,9 +1,12 @@
+import hmac
 import os
+import re
+import secrets
 import sqlite3
 import time
 from urllib.parse import quote_plus
 
-from flask import Flask, render_template, request, redirect, url_for, flash, g
+from flask import Flask, abort, render_template, request, redirect, url_for, flash, g, session
 
 DB_PATH = os.environ.get("DB_PATH", "/data/app.db")
 
@@ -28,7 +31,76 @@ DATABASE_URL = _database_url()
 USE_POSTGRES = DATABASE_URL is not None
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+_secret = os.environ.get("SECRET_KEY", "").strip()
+if not _secret or _secret in ("dev-secret-change-me", "change-this-in-production"):
+    # Never sign sessions with a known key: a guessable key lets anyone forge
+    # the session (and with it the CSRF token). Fall back to a random per-process key.
+    # Persist it next to the DB so every gunicorn worker shares one key. O_EXCL
+    # makes creation atomic when several workers start at once.
+    print("WARNING: SECRET_KEY not set; using a generated key stored in the data dir.", flush=True)
+    key_path = os.path.join(os.path.dirname(DB_PATH) or ".", ".secret_key")
+    try:
+        os.makedirs(os.path.dirname(key_path) or ".", exist_ok=True)
+        fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(secrets.token_hex(32))
+    except FileExistsError:
+        pass
+    for _ in range(50):  # another worker may still be writing it
+        with open(key_path) as f:
+            _secret = f.read().strip()
+        if _secret:
+            break
+        time.sleep(0.05)
+    if not _secret:
+        raise RuntimeError("Could not read generated secret key")
+app.secret_key = _secret
+app.config.update(
+    MAX_CONTENT_LENGTH=64 * 1024,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").lower() in ("1", "true", "yes"),
+)
+
+MAX_NAME = 120
+MAX_EMAIL = 254
+MAX_PHONE = 32
+MAX_QUERY = 100
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+PHONE_RE = re.compile(r"^[0-9+()\-.\s]*$")
+
+
+def csrf_token():
+    token = session.get("_csrf")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["_csrf"] = token
+    return token
+
+
+app.jinja_env.globals["csrf_token"] = csrf_token
+
+
+@app.before_request
+def csrf_protect():
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        sent = request.form.get("_csrf", "")
+        expected = session.get("_csrf", "")
+        if not expected or not hmac.compare_digest(sent, expected):
+            abort(400, description="Invalid or missing CSRF token")
+
+
+@app.after_request
+def security_headers(resp):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "same-origin")
+    resp.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
+        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    )
+    return resp
 
 
 class DB:
@@ -73,6 +145,7 @@ def close_db(_exc):
 def init_db(retries=10, delay=3):
     id_col = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
     for attempt in range(1, retries + 1):
+        db = None
         try:
             db = DB()
             db.execute(
@@ -85,7 +158,6 @@ def init_db(retries=10, delay=3):
                 )"""
             )
             db.commit()
-            db.close()
             print(f"Database ready ({'postgres' if USE_POSTGRES else 'sqlite'})", flush=True)
             return
         except Exception as exc:  # DB may not be up yet
@@ -93,11 +165,14 @@ def init_db(retries=10, delay=3):
             if attempt == retries:
                 raise
             time.sleep(delay)
+        finally:
+            if db is not None:
+                db.close()
 
 
 @app.route("/")
 def index():
-    q = request.args.get("q", "").strip()
+    q = request.args.get("q", "").strip()[:MAX_QUERY]
     db = get_db()
     if q:
         like = f"%{q}%"
@@ -117,12 +192,25 @@ def _form_data():
     return name, email, phone
 
 
+def _validate(name, email, phone):
+    if not name or not email:
+        return "Name aur Email required hain."
+    if len(name) > MAX_NAME or len(email) > MAX_EMAIL or len(phone) > MAX_PHONE:
+        return "Input bahut lamba hai."
+    if not EMAIL_RE.match(email):
+        return "Email sahi nahi hai."
+    if not PHONE_RE.match(phone):
+        return "Phone mein sirf digits, +, -, ( ) allowed hain."
+    return None
+
+
 @app.route("/create", methods=["GET", "POST"])
 def create():
     if request.method == "POST":
         name, email, phone = _form_data()
-        if not name or not email:
-            flash("Name aur Email required hain.", "error")
+        error = _validate(name, email, phone)
+        if error:
+            flash(error, "error")
             return render_template("form.html", item=request.form, action="Create")
         db = get_db()
         db.execute("INSERT INTO items (name, email, phone) VALUES (?, ?, ?)", (name, email, phone))
@@ -141,8 +229,9 @@ def edit(item_id):
         return redirect(url_for("index"))
     if request.method == "POST":
         name, email, phone = _form_data()
-        if not name or not email:
-            flash("Name aur Email required hain.", "error")
+        error = _validate(name, email, phone)
+        if error:
+            flash(error, "error")
             return render_template("form.html", item=request.form, action="Update")
         db.execute(
             "UPDATE items SET name = ?, email = ?, phone = ? WHERE id = ?",
@@ -169,7 +258,9 @@ def health():
         get_db().execute("SELECT 1")
         return {"status": "ok", "db": "postgres" if USE_POSTGRES else "sqlite"}
     except Exception as exc:
-        return {"status": "error", "error": str(exc)}, 503
+        # Don't leak connection strings / hostnames to unauthenticated callers.
+        print(f"Health check failed: {exc}", flush=True)
+        return {"status": "error"}, 503
 
 
 init_db()
